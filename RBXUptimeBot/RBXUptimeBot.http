@@ -1,0 +1,6 @@
+@RBXUptimeBot_HostAddress = http://localhost:5049
+
+GET {{RBXUptimeBot_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

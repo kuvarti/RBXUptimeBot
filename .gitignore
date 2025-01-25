@@ -3,6 +3,10 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# CUSTOM by KUVARTI
+AccountData.json
+AccountData.json.backup
+
 # dotenv files
 .env
 
