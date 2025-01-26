@@ -1,9 +1,23 @@
-﻿
+﻿using Microsoft.Extensions.Options;
+using RBXUptimeBot.Models;
 
-namespace RBXUptimeBot.Classes
+namespace RBXUptimeBot.Classes.Services
 {
-	public class JobManager
+	public class JobService
 	{
+		public static readonly IMongoDbService<JobEntry> _JobService;
+
+		static JobService() {
+			var configuration = new ConfigurationBuilder()
+				.SetBasePath(Directory.GetCurrentDirectory())
+				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+				.Build();
+			var mongoSettings = new MongoDBSettings();
+			configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
+			var options = Options.Create(mongoSettings);
+			_JobService = new MongoDbService<JobEntry>(options);
+		}
+
 		public static async Task<string> JobStarter(long jId, int accCount, DateTime end)
 		{
 			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
@@ -52,7 +66,8 @@ namespace RBXUptimeBot.Classes
 						RestartProcess(jid, item);
 				}
 				await Task.Delay(5000);
-				if (job.AccountCount > job.ProcessList.Count) {
+				if (job.AccountCount > job.ProcessList.Count)
+				{
 					await AddProcess(jid);
 				}
 				if (!job.isRunning)
@@ -82,7 +97,8 @@ namespace RBXUptimeBot.Classes
 			await AccountManager.LaunchAccounts(items, jid, "", new CancellationTokenSource());
 		}
 
-		public static async Task RestartProcess(long jid, ActiveItem a) {
+		public static async Task RestartProcess(long jid, ActiveItem a)
+		{
 			if (a.Account.IsActive == 0) return;
 			a.Account.LeaveServer();
 			await Task.Delay(60000);

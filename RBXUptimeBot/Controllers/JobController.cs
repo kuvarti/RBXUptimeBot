@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RBXUptimeBot.Classes;
+using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
 using System.Net;
 using System.Text.Json.Serialization;
@@ -31,7 +32,7 @@ namespace RBXUptimeBot.Controllers
 				return BadRequest("There is not enought account to launch job.");
 			try
 			{
-				var msg = await JobManager.JobStarter(text, count, DateTime.Now.AddMinutes(endTime));
+				var msg = await JobService.JobStarter(text, count, DateTime.Now.AddMinutes(endTime));
 				return Ok(msg);
 			}
 			catch (Exception e)

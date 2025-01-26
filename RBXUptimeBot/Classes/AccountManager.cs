@@ -12,6 +12,12 @@ using System.Text.RegularExpressions;
 using static System.Net.Mime.MediaTypeNames;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.Win32;
+using System.Net.NetworkInformation;
+using RBXUptimeBot.Classes.Services;
+using RBXUptimeBot.Models;
+using MongoDB.Driver;
+using Microsoft.Extensions.Options;
+using System.Configuration;
 
 namespace RBXUptimeBot.Classes
 {
@@ -50,6 +56,8 @@ namespace RBXUptimeBot.Classes
 		public static RestClient GameJoinClient;
 		public static RestClient Web13Client;
 
+		public static IMongoDbService<LogEntry> LogService;
+		//TODO job service
 
 		public static string CurrentVersion;
 		private readonly static DateTime startTime = DateTime.Now;
@@ -102,6 +110,16 @@ namespace RBXUptimeBot.Classes
 			FriendsClient = new RestClient("https://friends.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
 
+			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
+			var configuration = new ConfigurationBuilder()
+				.SetBasePath(Directory.GetCurrentDirectory())
+				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+				.Build();
+			var mongoSettings = new MongoDBSettings();
+			configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
+			var options = Options.Create(mongoSettings);
+			LogService = new MongoDbService<LogEntry>(options);
+
 			AccountsList = new List<Account>();
 			AllRunningAccounts = new List<ActiveItem>();
 			ActiveJobs = new List<ActiveJob>();
@@ -126,6 +144,8 @@ namespace RBXUptimeBot.Classes
 			LoadAccounts();
 			UpdateMultiRoblox();
 			Task.Run(RobloxProcess.UpdateMatches);
+			if (LogService.IsConnected())
+				LogService.CreateAsync(Logger.Information($"App started. {DateTime.Now.ToString()}"));
 		}
 
 		public void NextAccount() => LaunchNext = true;
