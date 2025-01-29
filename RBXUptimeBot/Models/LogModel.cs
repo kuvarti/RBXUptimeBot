@@ -27,6 +27,8 @@ namespace RBXUptimeBot.Models
 
 	public class LogEntry: IEntity
 	{
+		[BsonId]
+		[BsonRepresentation(BsonType.ObjectId)]
 		public string? Id { get; set; }
 		[BsonElement("Time")]			public DateTime Timestamp { get; set; }
 		[BsonElement("Level")]			public LogLevel Level { get; set; }

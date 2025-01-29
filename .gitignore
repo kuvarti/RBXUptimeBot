@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+/RBXUptimeBot/AccountData.json
+/RBXUptimeBot/AccountData.json.backup

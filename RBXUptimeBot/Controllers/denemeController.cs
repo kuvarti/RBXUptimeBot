@@ -20,6 +20,7 @@ namespace RBXUptimeBot.Controllers
 		[HttpGet("logs")]
 		public async Task<ActionResult> GetLogs()
 		{
+			await AccountManager.LogService?.CreateAsync(Logger.Information($"Logs fetched {DateTime.Now.ToString()}."));
 			var logs = Logger.GetAllLogs();
 
 			return Ok(logs);

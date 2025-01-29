@@ -30,11 +30,14 @@ namespace RBXUptimeBot.Classes.Services
 			var collectionName = GetCollectionName(typeof(T).Name, settings.Collections);
 			if (collectionName == null)
 			{
-				//throw new ArgumentException($"Collection name for type {typeof(T).Name} is not configured.");
-				Logger.Critical("$Collection name for type {typeof(T).Name} is not configured.");
+				Logger.Critical($"Collection name for type {typeof(T).Name} is not configured.");
 			}
 			else
 				_collection = _collectionsCache.GetOrAdd(collectionName, name => database.GetCollection<T>(name));
+			if (_collection == null)
+			{
+				Logger.Critical($"{collectionName} is not initialized");
+			}
 		}
 
 		private string? GetCollectionName(string typeName, Dictionary<string, string> collections)
@@ -47,23 +50,23 @@ namespace RBXUptimeBot.Classes.Services
 		}
 
 		public async Task<List<T>> GetAllAsync() =>
-			await _collection.Find(_ => true).ToListAsync();
+			await _collection?.Find(_ => true).ToListAsync();
 
 		public async Task<T?> GetByIdAsync(string id) =>
-			await _collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+			await _collection?.Find(x => x.Id == id).FirstOrDefaultAsync();
 
 		// TODO may create random id string
 		public async Task CreateAsync(T entity) =>
-			await _collection.InsertOneAsync(entity);
+			await _collection?.InsertOneAsync(entity);
 
 		public async Task UpdateAsync(string id, T entity)
 		{
 			entity.Id = id;
-			await _collection.ReplaceOneAsync(x => x.Id == id, entity);
+			await _collection?.ReplaceOneAsync(x => x.Id == id, entity);
 		}
 
 		public async Task DeleteAsync(string id) =>
-			await _collection.DeleteOneAsync(x => x.Id == id);
+			await _collection?.DeleteOneAsync(x => x.Id == id);
 
 		public bool IsConnected() => _collection != null;
 	}

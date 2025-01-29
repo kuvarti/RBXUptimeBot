@@ -1,13 +1,15 @@
 ﻿using Microsoft.Extensions.Options;
+using PuppeteerExtraSharp;
 using RBXUptimeBot.Models;
+using System.Security.Cryptography;
 
 namespace RBXUptimeBot.Classes.Services
 {
 	public class JobService
 	{
-		public static readonly IMongoDbService<JobEntry> _JobService;
+		public readonly IMongoDbService<JobEntry> _JobService;
 
-		static JobService() {
+		public JobService() {
 			var configuration = new ConfigurationBuilder()
 				.SetBasePath(Directory.GetCurrentDirectory())
 				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -18,24 +20,35 @@ namespace RBXUptimeBot.Classes.Services
 			_JobService = new MongoDbService<JobEntry>(options);
 		}
 
-		public static async Task<string> JobStarter(long jId, int accCount, DateTime end)
+		public async Task<string> JobStarter(long jId, int accCount, DateTime end)
 		{
 			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
 				return $"Not enough accounts to start the job.({AccountManager.AccountsList.Count})";
+			var job = new JobEntry() {
+				placeId = jId.ToString(),
+				AccCount = accCount,
+				StartTime = DateTime.Now,
+				EndTime = null,
+				Description = null,
+			};
+			_JobService.CreateAsync(job).GetAwaiter().GetResult();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
 				Jid = jId,
 				AccountCount = accCount,
 				startTime = DateTime.Now,
 				endTime = end,
+				DBid = job.Id,
 				ProcessList = new List<ActiveItem>()
 			});
 			new Thread(async () => await JobController(jId)).Start();
-			Logger.Trace($"job {jId} started in {DateTime.Now}");
+
+			if (AccountManager.LogService == null) Logger.Trace($"job {jId} started in {DateTime.Now}");
+			AccountManager.LogService?.CreateAsync(Logger.Trace($"job {jId} started in {DateTime.Now}"));
 			return $"Job {jId} started.";
 		}
 
-		public static async Task JobFinisher(long jid)
+		public async Task JobFinisher(long jid)
 		{
 			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
 			if (job == null)
@@ -49,11 +62,21 @@ namespace RBXUptimeBot.Classes.Services
 				AccountManager.AllRunningAccounts.RemoveAll(x => x.PID == item.PID);
 			}
 			AccountManager.ActiveJobs.Remove(job);
-			Logger.Information($"Job {jid} is finished {DateTime.Now}.");
-			// TODO: Add a log entry for the job finish to the db or json file
+
+			_JobService.UpdateAsync(job.DBid, new JobEntry()
+			{
+				placeId = jid.ToString(),
+				AccCount = job.AccountCount,
+				StartTime = job.startTime,
+				EndTime = DateTime.Now,
+				Description = null
+			}).GetAwaiter().GetResult();
+			if (AccountManager.LogService == null) Logger.Trace($"job {jid} is finished {DateTime.Now}");
+			AccountManager.LogService?.CreateAsync(Logger.Information($"Job {jid} is finished {DateTime.Now}."));
+
 		}
 
-		public static async Task JobController(long jid)
+		public async Task JobController(long jid)
 		{
 			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
 			if (job == null) return;
@@ -77,7 +100,7 @@ namespace RBXUptimeBot.Classes.Services
 		}
 
 		// Assingning early bc; it can be used from another process while running
-		public static async Task AddProcess(long jid)
+		public async Task AddProcess(long jid)
 		{
 			List<Account> items = new List<Account>();
 			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
@@ -97,8 +120,9 @@ namespace RBXUptimeBot.Classes.Services
 			await AccountManager.LaunchAccounts(items, jid, "", new CancellationTokenSource());
 		}
 
-		public static async Task RestartProcess(long jid, ActiveItem a)
+		public async Task RestartProcess(long jid, ActiveItem a)
 		{
+		//todo disconnect place somethign ,.asdioaujns
 			if (a.Account.IsActive == 0) return;
 			a.Account.LeaveServer();
 			await Task.Delay(60000);
