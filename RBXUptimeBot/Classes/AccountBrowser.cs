@@ -223,13 +223,13 @@ namespace RBXUptimeBot.Classes
 
 				if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password)) await page.ClickAsync("#login-button");
 
-				int active = 0, max = 30;
+				int active = 0, max = 100;
 				while (!page.IsClosed) {
 					if (active >= max) {
 						Logger.Error($"Account {Username} login attempt timeout. (5 min)");
 						break;
 					};
-					await Task.Delay(TimeSpan.FromSeconds(10));
+					await Task.Delay(TimeSpan.FromSeconds(3));
 					active++;
 				}
 				if (!page.IsClosed) page.CloseAsync();

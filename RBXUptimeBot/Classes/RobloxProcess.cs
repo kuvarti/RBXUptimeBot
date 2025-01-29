@@ -36,33 +36,6 @@ namespace RBXUptimeBot.Classes
             { "ReturnToApp2", @"\[FLog::SingleSurfaceApp\] returnToLuaApp: \.\.\. App has been initialized, returning from game\." }
         };
 
-        public static async void UpdateMatches()
-        {
-            try
-            {
-                using (HttpClient Client = new HttpClient())
-                {
-                    string MatchList = await Client.GetStringAsync("https://github.com/ic3w0lf22/Roblox-Account-Manager/raw/master/RBX%20Alt%20Manager/Resources/WatcherRegexMatches.txt");
-
-                    foreach (string Line in MatchList.Split('\n'))
-                    {
-                        int Split = Line.IndexOf('='); if (Split < 0) continue;
-
-                        string Name = Line.Substring(0, Split);
-                        string Value = Line.Substring(Split + 1);
-
-                        if (Matches.ContainsKey(Name)) Matches.Remove(Name);
-
-                        Matches.Add(Name, Value);
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                Logger.Error($"Couldn't update \"Matches\" dictionary: {exception.Message}", exception);
-            }
-        }
-
         public RobloxProcess(Process process)
         {
             Logger.Information($"New RobloxProcess created for {process.Id}");

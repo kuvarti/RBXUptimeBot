@@ -12,8 +12,10 @@ namespace RBXUptimeBot.Controllers
 	[ApiController]
 	public class JobController : ControllerBase
 	{
+		public static JobService _jobS;
 		public JobController(ILogger<JobController> logger)
 		{
+			_jobS = new JobService();
 		}
 
 		[HttpPost("start/{text}:{count}")]
@@ -24,6 +26,7 @@ namespace RBXUptimeBot.Controllers
 			if (exist != null) {
 				exist.AccountCount = count;
 				exist.endTime = DateTime.Now.AddMinutes(endTime);
+				AccountManager.LogService.CreateAsync(Logger.Warning($"Job {text} is changed while running.\nNew Account Count: {count}\nNew endTime: {exist.endTime.ToString()}"));
 				return BadRequest($"Job {text} already exist. changing parameters. Jon now end on {exist.endTime.ToString()}");
 			}
 			if (AccountManager.AccountsList.Count < 1)
@@ -32,7 +35,7 @@ namespace RBXUptimeBot.Controllers
 				return BadRequest("There is not enought account to launch job.");
 			try
 			{
-				var msg = await JobService.JobStarter(text, count, DateTime.Now.AddMinutes(endTime));
+				var msg = await _jobS.JobStarter(text, count, DateTime.Now.AddMinutes(endTime));
 				return Ok(msg);
 			}
 			catch (Exception e)

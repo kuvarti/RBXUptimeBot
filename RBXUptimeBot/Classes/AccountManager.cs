@@ -33,6 +33,7 @@ namespace RBXUptimeBot.Classes
 		public long Jid { get; set; }
 		public bool isRunning { get; set; }
 		public int AccountCount { get; set; }
+		public string DBid { get; set; }
 		public DateTime startTime { get; set; }
 		public DateTime endTime { get; set; }
 		public List<ActiveItem> ProcessList { get; set; }
@@ -111,19 +112,30 @@ namespace RBXUptimeBot.Classes
 			Web13Client = new RestClient("https://web.roblox.com/");
 
 			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
-			var configuration = new ConfigurationBuilder()
-				.SetBasePath(Directory.GetCurrentDirectory())
-				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-				.Build();
-			var mongoSettings = new MongoDBSettings();
-			configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
-			var options = Options.Create(mongoSettings);
-			LogService = new MongoDbService<LogEntry>(options);
+			try
+			{
+				var configuration = new ConfigurationBuilder()
+					.SetBasePath(Directory.GetCurrentDirectory())
+					.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+					.Build();
+				var mongoSettings = new MongoDBSettings();
+				configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
+				var options = Options.Create(mongoSettings);
+				LogService = new MongoDbService<LogEntry>(options);
+
+				if (LogService.IsConnected())
+				{
+					LogService.CreateAsync(Logger.Information($"App started. {DateTime.Now.ToString()}")).GetAwaiter().GetResult();
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.Critical($"Error creating MongoDbService: {ex}");
+			}
 
 			AccountsList = new List<Account>();
 			AllRunningAccounts = new List<ActiveItem>();
 			ActiveJobs = new List<ActiveJob>();
-			//AccountManagerInsance.Instance = this;
 
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 
@@ -143,9 +155,6 @@ namespace RBXUptimeBot.Classes
 
 			LoadAccounts();
 			UpdateMultiRoblox();
-			Task.Run(RobloxProcess.UpdateMatches);
-			if (LogService.IsConnected())
-				LogService.CreateAsync(Logger.Information($"App started. {DateTime.Now.ToString()}"));
 		}
 
 		public void NextAccount() => LaunchNext = true;
