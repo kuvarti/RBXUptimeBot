@@ -78,13 +78,15 @@ namespace RBXUptimeBot.Classes
 
 			string ProxiesPath = Path.Combine(Environment.CurrentDirectory, "proxies.txt");
 			string ProxyString = string.Empty, Username = string.Empty, Password = string.Empty;
+			string proxyError = "[";
 
-			if (AccountManager.General.Get<bool>("UseProxies") && File.Exists(ProxiesPath))
+			if (/*AccountManager.General.Get<bool>("UseProxies") &&*/File.Exists(ProxiesPath))
 			{ // Format: [optional protocol://]ip:port@user:pass / socks5://1.2.3.4:999@user:pass
 				Random Rng = new Random();
 				int Timeout = AccountManager.General.Exists("ProxyTimeout") ? AccountManager.General.Get<int>("ProxyTimeout") : 3000;
 				int Limit = AccountManager.General.Exists("ProxyTestLimit") ? AccountManager.General.Get<int>("ProxyTestLimit") : 10;
 				List<string> Proxies = File.ReadAllLines(ProxiesPath).ToList();
+				Proxies.RemoveAll(Proxies => Proxies.StartsWith('#') || Proxies.Equals(""));
 
 				Proxies.OrderBy(x => Rng.Next());
 
@@ -121,11 +123,18 @@ namespace RBXUptimeBot.Classes
 
 					using (var Handler = new HttpClientHandler() { Proxy = Proxy })
 					using (var Client = new HttpClient(Handler) { Timeout = TimeSpan.FromMilliseconds(Timeout) })
-						try { (await Client.GetAsync("https://auth.roblox.com/")).EnsureSuccessStatusCode(); } catch { ProxyString = string.Empty; }
+						try { (await Client.GetAsync("https://auth.roblox.com/")).EnsureSuccessStatusCode(); } 
+						catch (Exception e)
+						{
+							if (proxyError.Length > 1) proxyError += ",";
+							ProxyString = string.Empty;
+							proxyError += $"{{\"Message\":\"{e.Message.Replace('\"', '$')}\"}}";
+						}
 
 					if (!string.IsNullOrEmpty(ProxyString)) break;
 				}
 
+				proxyError += "]";
 				if (!string.IsNullOrEmpty(ProxyString))
 				{
 					ProxyString = Proxy?.GetProxy(null).Authority ?? ProxyString;
@@ -135,6 +144,7 @@ namespace RBXUptimeBot.Classes
 
 					Args.Add($"--proxy-server={ProxyString}");
 				}
+				else await AccountManager.LogService.CreateAsync(Logger.Error($"No Proxies found or logged in while account login. Process will be continue without proxy.", new Exception(proxyError)));
 			}
 
 			var Options = new LaunchOptions { Headless = false, DefaultViewport = null, Args = Args.ToArray(), IgnoreHTTPSErrors = true };
@@ -224,8 +234,10 @@ namespace RBXUptimeBot.Classes
 				if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password)) await page.ClickAsync("#login-button");
 
 				int active = 0, max = 100;
-				while (!page.IsClosed) {
-					if (active >= max) {
+				while (!page.IsClosed)
+				{
+					if (active >= max)
+					{
 						Logger.Error($"Account {Username} login attempt timeout. (5 min)");
 						break;
 					};
