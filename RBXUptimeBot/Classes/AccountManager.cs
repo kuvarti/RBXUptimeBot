@@ -155,6 +155,8 @@ namespace RBXUptimeBot.Classes
 
 			LoadAccounts();
 			UpdateMultiRoblox();
+			//Console.WriteLine($"Log service {(LogService.IsConnected() ? "Ready" : "cannot be ready")} to use.");
+			//Console.WriteLine("RBXUptimeBot ready to use. Made by Kuvarti.");
 		}
 
 		public void NextAccount() => LaunchNext = true;
@@ -344,7 +346,6 @@ namespace RBXUptimeBot.Classes
 		{
 			CancellationTokenSource Token = token;
 			List<ActiveItem> items = new List<ActiveItem>();
-			int Delay = General.Exists("AccountJoinDelay") ? General.Get<int>("AccountJoinDelay") : 8;
 
 			bool AsyncJoin = General.Get<bool>("AsyncJoin");
 
@@ -364,7 +365,7 @@ namespace RBXUptimeBot.Classes
 				{
 					await account.JoinServer(PlaceId, JobId, FollowUser, VIPServer);
 				}).Start();
-				await Task.Delay(Delay * 1000);
+				await Task.Delay(TimeSpan.FromSeconds(10));
 			}
 			Token.Cancel();
 			Token.Dispose();

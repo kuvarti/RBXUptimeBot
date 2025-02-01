@@ -6,6 +6,7 @@
 # CUSTOM by KUVARTI
 *AccountData.json
 *AccountData.json.backup
+proxies.txt
 
 # dotenv files
 .env

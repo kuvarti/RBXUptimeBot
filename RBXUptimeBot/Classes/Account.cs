@@ -540,25 +540,25 @@ namespace RBXUptimeBot.Classes
 					try { Launcher = Process.Start(LaunchInfo); }
 					catch (Exception e) { Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}"); }
 
-					//if (Launcher == null)
-					//{
-					//	Logger.Error($"JobID({PlaceID})({this.Username}) - Launcher is null. process cannot be started");
-					//	return;
-					//}
 					if (Launcher == null || Launcher.HasExited)
 					{
 						Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})");
 						return;
 					}
-					int pid = 0;
-					while (pid == 0) {
+					Process pid = null;
+					while (pid == null) {
 						pid = await GetNewPId();
-						await Task.Delay(1000);
+						await Task.Delay(TimeSpan.FromSeconds(1)); 
 					}
+					await Task.Delay(TimeSpan.FromSeconds(2)); //wait 3 seconds total for potancial error
+					if (pid.MainWindowTitle != "Roblox") {
+						throw new Exception($"Something wrong with this roblox instance: {pid.MainWindowTitle}, {this.Username}.");
+					}
+
 					var isExist = job.ProcessList.Find(item => item.Account == this);
 					if (isExist != null)
 					{
-						isExist.PID = pid;
+						isExist.PID = pid.Id;
 						isExist.StartTime = DateTime.Now;
 						AccountManager.AllRunningAccounts.Add(isExist);
 					}
@@ -567,13 +567,13 @@ namespace RBXUptimeBot.Classes
 						ActiveItem ret = new ActiveItem()
 						{
 							Account = this,
-							PID = pid,
+							PID = pid.Id,
 							StartTime = DateTime.Now
 						};
 						job.ProcessList.Add(ret);
 						AccountManager.AllRunningAccounts.Add(ret);
 					}
-					IsActive = pid;
+					IsActive = pid.Id;
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
 					Launcher.WaitForExit();
 				}
@@ -612,13 +612,13 @@ namespace RBXUptimeBot.Classes
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
 
-		static async Task<int> GetNewPId() {
+		static async Task<Process> GetNewPId() {
 			var processes = Process.GetProcessesByName("RobloxPlayerBeta");
 			foreach (var process in processes) {
 				if (AccountManager.AllRunningAccounts.Find(acc => acc.PID == process.Id) == null)
-					return process.Id;
+					return process;
 			}
-			return 0;
+			return null;
 		}
 
 		public async void AdjustWindowPosition()
