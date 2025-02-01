@@ -3,10 +3,11 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using RBXUptimeBot.Models;
 using RBXUptimeBot.Classes;
+using MongoDB.Bson;
 
 namespace RBXUptimeBot.Classes.Services
 {
-	public interface IMongoDbService<T> where T: IEntity
+	public interface IMongoDbService<T> where T : IEntity
 	{
 		Task<List<T>> GetAllAsync();
 		Task<T?> GetByIdAsync(string id);
@@ -34,9 +35,14 @@ namespace RBXUptimeBot.Classes.Services
 			}
 			else
 				_collection = _collectionsCache.GetOrAdd(collectionName, name => database.GetCollection<T>(name));
-			if (_collection == null)
+			try
+			{
+				database.RunCommandAsync((Command<BsonDocument>)"{ping:1}").GetAwaiter().GetResult();
+			}
+			catch
 			{
 				Logger.Critical($"{collectionName} is not initialized");
+				_collection = null;
 			}
 		}
 
@@ -49,24 +55,41 @@ namespace RBXUptimeBot.Classes.Services
 			return null;
 		}
 
-		public async Task<List<T>> GetAllAsync() =>
-			await _collection?.Find(_ => true).ToListAsync();
+		public async Task<List<T>> GetAllAsync()
+		{
+			if (_collection != null)
+				return await _collection.Find(_ => true).ToListAsync();
+			else
+				return null;
+		}
 
-		public async Task<T?> GetByIdAsync(string id) =>
-			await _collection?.Find(x => x.Id == id).FirstOrDefaultAsync();
+		public async Task<T?> GetByIdAsync(string id)
+		{
+			if (_collection != null)
+				return await _collection.Find(x => x.Id == id).FirstOrDefaultAsync();
+			else
+				return default(T);
+		}
 
 		// TODO may create random id string
-		public async Task CreateAsync(T entity) =>
-			await _collection?.InsertOneAsync(entity);
+		public async Task CreateAsync(T entity)
+		{
+			if (_collection != null)
+				await _collection.InsertOneAsync(entity);
+		}
 
 		public async Task UpdateAsync(string id, T entity)
 		{
 			entity.Id = id;
-			await _collection?.ReplaceOneAsync(x => x.Id == id, entity);
+			if (_collection != null)
+				await _collection.ReplaceOneAsync(x => x.Id == id, entity);
 		}
 
-		public async Task DeleteAsync(string id) =>
-			await _collection?.DeleteOneAsync(x => x.Id == id);
+		public async Task DeleteAsync(string id)
+		{
+			if (_collection != null)
+				await _collection.DeleteOneAsync(x => x.Id == id);
+		}
 
 		public bool IsConnected() => _collection != null;
 	}
