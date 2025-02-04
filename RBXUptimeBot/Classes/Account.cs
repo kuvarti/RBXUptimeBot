@@ -548,9 +548,10 @@ namespace RBXUptimeBot.Classes
 					Process pid = null;
 					while (pid == null) {
 						pid = await GetNewPId();
-						await Task.Delay(TimeSpan.FromSeconds(1)); 
+						await Task.Delay(TimeSpan.FromSeconds(1));
 					}
-					await Task.Delay(TimeSpan.FromSeconds(2)); //wait 3 seconds total for potancial error
+					IsActive = pid.Id;
+					await Task.Delay(TimeSpan.FromSeconds(30)); //wait 30 seconds total for potancial error
 					if (pid.MainWindowTitle != "Roblox") {
 						throw new Exception($"Something wrong with this roblox instance: {pid.MainWindowTitle}, {this.Username}.");
 					}
@@ -573,7 +574,6 @@ namespace RBXUptimeBot.Classes
 						job.ProcessList.Add(ret);
 						AccountManager.AllRunningAccounts.Add(ret);
 					}
-					IsActive = pid.Id;
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
 					Launcher.WaitForExit();
 				}
@@ -583,6 +583,7 @@ namespace RBXUptimeBot.Classes
 					{
 						AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == Launcher.Id);
 						job.ProcessList.RemoveAll(item => item.PID == Launcher.Id);
+						this.LeaveServer();
 					}
 					this.IsActive = 0;
 					Logger.Error($"Error: {x.Message}", x);
@@ -603,7 +604,7 @@ namespace RBXUptimeBot.Classes
 			{
 				this.IsActive = 0;
 				this.LastUse = DateTime.Now;
-				Process.GetProcessById(process).Kill();
+				Process.GetProcessById(process).Kill(); //TODO: fix exception here when roblox failes launchh
 			}
 			catch (Exception e)
 			{
