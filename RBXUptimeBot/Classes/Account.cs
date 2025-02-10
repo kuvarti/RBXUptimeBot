@@ -13,6 +13,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web;
+using WebSocketSharp;
 using static RBXUptimeBot.Classes.RobloxWatcher;
 
 namespace RBXUptimeBot.Classes
@@ -318,7 +319,6 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
-		//todo use this
 		public bool LogOutOfOtherSessions(bool Internal = false)
 		{
 			if (!CheckPin(Internal)) return false;
@@ -440,7 +440,8 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetCSRFToken(out string Token))
 			{
-				Logger.Error($"ERROR: Account Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
+				LoginFailedProcedure($"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
+				await AccountManager.LogoutAccount(Username);
 				return;
 			}
 			if (AccountManager.ShuffleJobID && string.IsNullOrEmpty(JobID))
@@ -448,7 +449,7 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetAuthTicket(out string Ticket))
 			{
-				Logger.Error("ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
+				LoginFailedProcedure("ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
 				return;
 			}
 
@@ -475,7 +476,7 @@ namespace RBXUptimeBot.Classes
 						}
 					}
 				}
-				catch (Exception x) { Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x); }
+				catch (Exception x) { await AccountManager.LogService.CreateAsync(Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x)); }
 			}
 
 			string LinkCode = string.IsNullOrEmpty(JobID) ? string.Empty : Regex.Match(JobID, "privateServerLinkCode=(.+)")?.Groups[1]?.Value;
@@ -521,7 +522,7 @@ namespace RBXUptimeBot.Classes
 				var job = AccountManager.ActiveJobs.Find(item => item.Jid == PlaceID);
 				if (job == null)
 				{
-					Logger.Error($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
+					LoginFailedProcedure($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
 					return;
 				}
 
@@ -538,11 +539,11 @@ namespace RBXUptimeBot.Classes
 						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false{(AccountManager.IsTeleport ? "&isTeleport=true" : "")}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
 
 					try { Launcher = Process.Start(LaunchInfo); }
-					catch (Exception e) { Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}"); }
+					catch (Exception e) { await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}")); }
 
 					if (Launcher == null || Launcher.HasExited)
 					{
-						Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})");
+						await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})"));
 						return;
 					}
 					Process pid = null;
@@ -551,10 +552,13 @@ namespace RBXUptimeBot.Classes
 						await Task.Delay(TimeSpan.FromSeconds(1));
 					}
 					IsActive = pid.Id;
-					await Task.Delay(TimeSpan.FromSeconds(30)); //wait 30 seconds total for potancial error
-					if (pid.MainWindowTitle != "Roblox") {
-						throw new Exception($"Something wrong with this roblox instance: {pid.MainWindowTitle}, {this.Username}.");
-					}
+
+					Task errorcheck = Task.Run(async () => { 
+						await Task.Delay(TimeSpan.FromMinutes(1));
+						if (pid.MainWindowTitle != "Roblox") {
+							throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open": pid.MainWindowTitle)}), {this.Username}.");
+						}
+					});
 
 					var isExist = job.ProcessList.Find(item => item.Account == this);
 					if (isExist != null)
@@ -575,6 +579,8 @@ namespace RBXUptimeBot.Classes
 						AccountManager.AllRunningAccounts.Add(ret);
 					}
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
+					semaphore.Release();
+					await errorcheck;
 					Launcher.WaitForExit();
 				}
 				catch (Exception x)
@@ -585,14 +591,17 @@ namespace RBXUptimeBot.Classes
 						job.ProcessList.RemoveAll(item => item.PID == Launcher.Id);
 						this.LeaveServer();
 					}
+					semaphore.Release();
 					this.IsActive = 0;
 					Logger.Error($"Error: {x.Message}", x);
 				}
-				finally
-				{
-					semaphore.Release();
-				}
 			});
+		}
+
+		private async void LoginFailedProcedure(string text) {
+			semaphore.Release();
+			await AccountManager.LogService.CreateAsync(Logger.Error(text));
+			IsActive = 0;
 		}
 
 		public void LeaveServer(long jid = 0)
@@ -604,11 +613,11 @@ namespace RBXUptimeBot.Classes
 			{
 				this.IsActive = 0;
 				this.LastUse = DateTime.Now;
-				Process.GetProcessById(process).Kill(); //TODO: fix exception here when roblox failes launchh
+				if (process != 0) Process.GetProcessById(process).Kill();
 			}
 			catch (Exception e)
 			{
-				Logger.Error($"Failed to kill process {process}", e);
+				AccountManager.LogService.CreateAsync(Logger.Error($"Failed to kill process {process}", e));
 			}
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
