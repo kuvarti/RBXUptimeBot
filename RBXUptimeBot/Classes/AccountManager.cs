@@ -58,7 +58,6 @@ namespace RBXUptimeBot.Classes
 		public static RestClient Web13Client;
 
 		public static IMongoDbService<LogEntry> LogService;
-		//TODO job service
 
 		public static string CurrentVersion;
 		private readonly static DateTime startTime = DateTime.Now;
@@ -319,6 +318,7 @@ namespace RBXUptimeBot.Classes
 
 				var accountBrowser = new AccountBrowser() { Index = i, Size = Size };
 				await accountBrowser.Login(username, Combo.Substring(Combo.IndexOf(":") + 1));
+				await Task.Delay(TimeSpan.FromSeconds(60));
 			}
 		}
 
@@ -361,11 +361,15 @@ namespace RBXUptimeBot.Classes
 					if (!string.IsNullOrEmpty(account.GetField("SavedPlaceId")) && long.TryParse(account.GetField("SavedPlaceId"), out long PID)) PlaceId = PID;
 					if (!string.IsNullOrEmpty(account.GetField("SavedJobId"))) JobId = account.GetField("SavedJobId");
 				}
+				if (!AccountManager.ActiveJobs.Find(job => job.Jid == PlaceID).isRunning )
+					break;
 				new Thread(async () =>
 				{
 					await account.JoinServer(PlaceId, JobId, FollowUser, VIPServer);
+					if (account.IsActive <= 10)
+						account.IsActive = 0;
 				}).Start();
-				await Task.Delay(TimeSpan.FromSeconds(10));
+				await Task.Delay(TimeSpan.FromSeconds(60));
 			}
 			Token.Cancel();
 			Token.Dispose();
