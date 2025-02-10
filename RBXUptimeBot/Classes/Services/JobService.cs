@@ -83,11 +83,11 @@ namespace RBXUptimeBot.Classes.Services
 			job.isRunning = true;
 			while (DateTime.Now < job.endTime)
 			{
-				foreach (var item in job.ProcessList)
-				{
-					if (item.StartTime.AddMinutes(20) < DateTime.Now) //TODO THIS IS ORIGINALLY 20
-						RestartProcess(jid, item);
-				}
+				//foreach (var item in job.ProcessList)
+				//{
+				//	if (item.StartTime.AddMinutes(20) < DateTime.Now) //TODO THIS IS ORIGINALLY 20
+				//		RestartProcess(jid, item);
+				//}
 				await Task.Delay(5000);
 				if (job.AccountCount > job.ProcessList.Count)
 				{
@@ -122,7 +122,6 @@ namespace RBXUptimeBot.Classes.Services
 
 		public async Task RestartProcess(long jid, ActiveItem a)
 		{
-		//todo disconnect place somethign ,.asdioaujns
 			if (a.Account.IsActive == 0) return;
 			a.Account.LeaveServer();
 			await Task.Delay(60000);
