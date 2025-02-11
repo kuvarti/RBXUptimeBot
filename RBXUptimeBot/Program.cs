@@ -23,8 +23,8 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+	AccountManager.isDevelopment = true;
 	app.UseSwagger();
-
 	app.UseSwaggerUI();
 }
 

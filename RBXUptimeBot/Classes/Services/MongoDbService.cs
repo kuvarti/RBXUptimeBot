@@ -24,6 +24,7 @@ namespace RBXUptimeBot.Classes.Services
 
 		public MongoDbService(IOptions<MongoDBSettings> mongoDbSettings)
 		{
+			if (AccountManager.isDevelopment) return ;
 			var settings = mongoDbSettings.Value;
 			var client = new MongoClient(settings.ConnectionString);
 			var database = client.GetDatabase(settings.DatabaseName);

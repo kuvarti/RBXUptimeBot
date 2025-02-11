@@ -82,7 +82,7 @@ namespace RBXUptimeBot.Classes.Services
 			if (job == null) return;
 			job.isRunning = true;
 			while (DateTime.Now < job.endTime)
-			{
+			{//todo make check process name
 				//foreach (var item in job.ProcessList)
 				//{
 				//	if (item.StartTime.AddMinutes(20) < DateTime.Now) //TODO THIS IS ORIGINALLY 20
