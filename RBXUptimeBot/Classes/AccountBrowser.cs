@@ -80,7 +80,7 @@ namespace RBXUptimeBot.Classes
 			string ProxyString = string.Empty, Username = string.Empty, Password = string.Empty;
 			string proxyError = "[";
 
-			if (/*AccountManager.General.Get<bool>("UseProxies") &&*/File.Exists(ProxiesPath))
+			if (AccountManager.General.Get<bool>("UseProxies") && File.Exists(ProxiesPath))
 			{ // Format: [optional protocol://]ip:port@user:pass / socks5://1.2.3.4:999@user:pass
 				Random Rng = new Random();
 				int Timeout = AccountManager.General.Exists("ProxyTimeout") ? AccountManager.General.Get<int>("ProxyTimeout") : 3000;
@@ -209,13 +209,13 @@ namespace RBXUptimeBot.Classes
 						else if (Regex.IsMatch(Url.AbsolutePath, "/users/[0-9]+/two-step-verification/login") && (await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
 							await AddAccount(Cookie);
 						else
-							Logger.Warning($"Account {Username} cannot be logged in.");
+							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
 						tcs.TrySetResult(true);
 					}
 				}
 				catch (Exception ex)
 				{
-					Logger.Error($"Exception in RequestFinished handler: {ex}", ex);
+					await AccountManager.LogService.CreateAsync(Logger.Error($"Exception in RequestFinished handler: {ex}", ex));
 					tcs.TrySetException(ex);
 				}
 			}
@@ -233,22 +233,23 @@ namespace RBXUptimeBot.Classes
 
 				if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password)) await page.ClickAsync("#login-button");
 
-				int active = 0, max = 100;
+				int active = 0, max = AccountManager.General.Get<int>("CaptchaTimeOut");
 				while (!page.IsClosed)
 				{
 					if (active >= max)
 					{
-						Logger.Error($"Account {Username} login attempt timeout. (5 min)");
+						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
 						break;
 					};
-					await Task.Delay(TimeSpan.FromSeconds(3));
-					active++;
+					await Task.Delay(TimeSpan.FromSeconds(2));
+					active += 2;
 				}
+				//TODO check url
 				if (!page.IsClosed) page.CloseAsync();
 			}
 			catch (Exception ex)
 			{
-				Logger.Error($"An exception was caught while trying to automatically log in: {ex}", ex);
+				await AccountManager.LogService.CreateAsync(Logger.Error($"An exception was caught while trying to automatically log in: {ex.Message}", ex));
 			}
 			// here is the wait for Page_RequestFinished function to be waited
 			using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)))
@@ -259,7 +260,7 @@ namespace RBXUptimeBot.Classes
 				}
 				catch (OperationCanceledException a)
 				{
-					Logger.Error("Waiting for RequestFinished timed out.", a);
+					await AccountManager.LogService.CreateAsync(Logger.Error("Waiting for RequestFinished timed out.", a));
 				}
 				finally
 				{
@@ -371,7 +372,7 @@ namespace RBXUptimeBot.Classes
 			}
 		}
 
-		//private async void Page_RequestFinished(object sender, RequestEventArgs e)
+		//private async void  (object sender, RequestEventArgs e)
 		//{
 		//	Uri Url = new Uri(e.Request.Url);
 
@@ -398,7 +399,7 @@ namespace RBXUptimeBot.Classes
 			{
 				await page.WaitForNavigationAsync();
 				var a = AccountManager.AddAccount(SecurityToken.Value, Password, await page.EvaluateFunctionAsync<string>("() => { return fetch('/my/account/json').then(x=>x.text()); }"));
-				Logger.Information($"Account '{a.Username}' is logged in.");
+				await AccountManager.LogService.CreateAsync(Logger.Information($"Account '{a.Username}' is logged in."));
 			}
 
 			Password = null;

@@ -461,7 +461,6 @@ namespace RBXUptimeBot.Classes
 					{
 						var TrackerMatch = Regex.Match(proc.GetCommandLine(), @"\-b (\d+)");
 						string TrackerID = TrackerMatch.Success ? TrackerMatch.Groups[1].Value : string.Empty;
-
 						if (TrackerID == BrowserTrackerID)
 						{
 							try // ignore ObjectDisposedExceptions
@@ -554,7 +553,7 @@ namespace RBXUptimeBot.Classes
 					IsActive = pid.Id;
 
 					Task errorcheck = Task.Run(async () => { 
-						await Task.Delay(TimeSpan.FromMinutes(1));
+						await Task.Delay(TimeSpan.FromSeconds(AccountManager.General.Get<int>("LaunchDelay")));
 						if (pid.MainWindowTitle != "Roblox") {
 							throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open": pid.MainWindowTitle)}), {this.Username}.");
 						}
@@ -613,7 +612,12 @@ namespace RBXUptimeBot.Classes
 			{
 				this.IsActive = 0;
 				this.LastUse = DateTime.Now;
-				if (process != 0) Process.GetProcessById(process).Kill();
+				if (process != 0)
+				{
+					var proc = Process.GetProcessById(process);
+					proc.CloseMainWindow();
+					proc.Kill();
+				}
 			}
 			catch (Exception e)
 			{

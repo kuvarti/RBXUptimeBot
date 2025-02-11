@@ -62,6 +62,7 @@ namespace RBXUptimeBot.Classes
 		public static string CurrentVersion;
 		private readonly static DateTime startTime = DateTime.Now;
 
+		public static bool isDevelopment = false;
 		public static bool IsTeleport = false;
 		public static bool UseOldJoin = false;
 		public static bool ShuffleJobID = false;
@@ -136,6 +137,11 @@ namespace RBXUptimeBot.Classes
 			AllRunningAccounts = new List<ActiveItem>();
 			ActiveJobs = new List<ActiveJob>();
 
+			if (!General.Exists("JoinDelay")) General.Set("JoinDelay", "60");
+			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
+			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
+			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
+
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 
 			if (!Prompts.Exists("VCPrompted") && (VCKey == null || (VCKey is RegistryKey && VCKey.GetValue("Bld") is int VCVersion && VCVersion < 32532)))
@@ -151,11 +157,9 @@ namespace RBXUptimeBot.Classes
 
 					Prompts.Set("VCPrompted", "1");
 				});
-
 			LoadAccounts();
 			UpdateMultiRoblox();
-			//Console.WriteLine($"Log service {(LogService.IsConnected() ? "Ready" : "cannot be ready")} to use.");
-			//Console.WriteLine("RBXUptimeBot ready to use. Made by Kuvarti.");
+			IniSettings.Save("RAMSettings.ini");
 		}
 
 		public void NextAccount() => LaunchNext = true;
@@ -308,10 +312,11 @@ namespace RBXUptimeBot.Classes
 				string Combo = ComboList[i];
 
 				if (!Combo.Contains(':')) continue;
-				
+
 				string username = Combo.Substring(0, Combo.IndexOf(':'));
 
-				if (AccountManager.AccountsList.Find(x => x.Username == username) != null) {
+				if (AccountManager.AccountsList.Find(x => x.Username == username) != null)
+				{
 					Logger.Warning($"Account '{username}' already signed in.");
 					continue;
 				}
@@ -332,8 +337,10 @@ namespace RBXUptimeBot.Classes
 			ComboList.ForEach(ComboList =>
 			{
 				var lst = AccountManager.AccountsList.FindAll(acc => acc.Username == ComboList);
-				if (lst.Any()) {
-					lst.ForEach(acc => {
+				if (lst.Any())
+				{
+					lst.ForEach(acc =>
+					{
 						i += AccountManager.AccountsList.Remove(acc) ? 1 : 0;
 						Logger.Information($"Account '{acc.Username}' is logged out.");
 					});
@@ -361,7 +368,7 @@ namespace RBXUptimeBot.Classes
 					if (!string.IsNullOrEmpty(account.GetField("SavedPlaceId")) && long.TryParse(account.GetField("SavedPlaceId"), out long PID)) PlaceId = PID;
 					if (!string.IsNullOrEmpty(account.GetField("SavedJobId"))) JobId = account.GetField("SavedJobId");
 				}
-				if (!AccountManager.ActiveJobs.Find(job => job.Jid == PlaceID).isRunning )
+				if (!AccountManager.ActiveJobs.Find(job => job.Jid == PlaceID).isRunning)
 					break;
 				new Thread(async () =>
 				{
@@ -369,7 +376,7 @@ namespace RBXUptimeBot.Classes
 					if (account.IsActive <= 10)
 						account.IsActive = 0;
 				}).Start();
-				await Task.Delay(TimeSpan.FromSeconds(60));
+				await Task.Delay(TimeSpan.FromSeconds(General.Get<int>("JoinDelay")));
 			}
 			Token.Cancel();
 			Token.Dispose();
