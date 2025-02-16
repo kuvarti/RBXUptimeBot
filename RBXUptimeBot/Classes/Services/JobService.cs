@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using PuppeteerExtraSharp;
 using RBXUptimeBot.Models;
+using System.Diagnostics;
 using System.Security.Cryptography;
 
 namespace RBXUptimeBot.Classes.Services
@@ -79,15 +80,23 @@ namespace RBXUptimeBot.Classes.Services
 		public async Task JobController(long jid)
 		{
 			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			List<Account> accounts = new List<Account>();
 			if (job == null) return;
 			job.isRunning = true;
 			while (DateTime.Now < job.endTime)
-			{//todo make check process name
-				//foreach (var item in job.ProcessList)
-				//{
-				//	if (item.StartTime.AddMinutes(20) < DateTime.Now) //TODO THIS IS ORIGINALLY 20
-				//		RestartProcess(jid, item);
-				//}
+			{
+				foreach (var item in job.ProcessList)
+				{
+					if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox") {
+						AccountManager.LogService.CreateAsync(Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'"));
+						accounts.Add(item.Account);
+					}
+				}
+				foreach (var account in accounts){
+					account.LeaveServer();
+					job.ProcessList.RemoveAll(ritem => ritem.Account == account);
+				}
+				accounts.Clear();
 				await Task.Delay(5000);
 				if (job.AccountCount > job.ProcessList.Count)
 				{
