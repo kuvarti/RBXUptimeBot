@@ -201,15 +201,6 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
-		public async Task<string> GetEmailJSON()
-		{
-			RestRequest DataRequest = MakeRequest("v1/email", Method.Get);
-
-			RestResponse response = await AccountManager.AccountClient.ExecuteAsync(DataRequest);
-
-			return response.Content;
-		}
-
 		public async Task<JToken> GetMobileInfo()
 		{
 			RestRequest DataRequest = MakeRequest("mobileapi/userinfo", Method.Get);
@@ -221,20 +212,6 @@ namespace RBXUptimeBot.Classes
 
 			return null;
 		}
-
-		public async Task<JToken> GetUserInfo()
-		{
-			RestRequest DataRequest = MakeRequest($"v1/users/{UserID}", Method.Get);
-
-			RestResponse response = await AccountManager.UsersClient.ExecuteAsync(DataRequest);
-
-			if (response.StatusCode == HttpStatusCode.OK && Utilities.TryParseJson(response.Content, out JToken Data))
-				return Data;
-
-			return null;
-		}
-
-		public async Task<long> GetRobux() => (await GetMobileInfo())?["RobuxBalance"]?.Value<long>() ?? 0;
 
 		public bool SetFollowPrivacy(int Privacy)
 		{
@@ -269,34 +246,6 @@ namespace RBXUptimeBot.Classes
 
 			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK) return true;
 
-			return false;
-		}
-
-		public bool ChangePassword(string Current, string New)
-		{
-			if (!CheckPin()) return false;
-			if (!GetCSRFToken(out string Token)) return false;
-
-			RestRequest request = MakeRequest("v2/user/passwords/change", Method.Post)
-				.AddHeader("Referer", "https://www.roblox.com/")
-				.AddHeader("X-CSRF-TOKEN", Token)
-				.AddHeader("Content-Type", "application/x-www-form-urlencoded")
-				.AddParameter("currentPassword", Current)
-				.AddParameter("newPassword", New);
-
-			RestResponse response = AccountManager.AuthClient.Execute(request);
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
-			{
-				Password = New;
-				var SToken = response.Cookies[".ROBLOSECURITY"];
-				if (SToken != null)
-				{
-					SecurityToken = SToken.Value;
-					AccountManager.SaveAccounts();
-				}
-				return true;
-			}
 			return false;
 		}
 
@@ -430,8 +379,44 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
+		private async Task Wait4Proxyfier()
+		{
+			Process p = null;
+			while (p == null)
+			{
+				var pl = Process.GetProcessesByName("Proxifier");
+				if (pl != null) p = pl.FirstOrDefault();
+				await Task.Delay(TimeSpan.FromSeconds(1));
+			}
+		}
+
+		private async Task<Process> Wait4Roblox()
+		{
+			int i = 0, imax = AccountManager.General.Get<int>("BloxstrapTimeout");
+			while (true)
+			{
+				var rbx = Process.GetProcessesByName("RobloxPlayerBeta");
+				foreach (var process in rbx)
+				{
+					if (AccountManager.AllRunningAccounts.Find(acc => acc.PID == process.Id) == null)
+						return process;
+				}
+				i++; if (i > imax) break;
+				await Task.Delay(TimeSpan.FromSeconds(1));
+			}
+			var blox = Process.GetProcessesByName("Bloxstrap");
+			foreach (var process in blox)
+			{
+				process.Kill();
+			}
+			return null;
+		}
+
 		public async Task JoinServer(long PlaceID, string JobID = "", bool FollowUser = false, bool JoinVIP = false, bool Internal = false) // oh god i am not refactoring everything to be async im sorry
 		{
+			LaunchAutomation LA = new LaunchAutomation();
+			LA.LaunchProcess();
+			await Wait4Proxyfier();
 			if (string.IsNullOrEmpty(BrowserTrackerID))
 			{
 				Random r = new Random();
@@ -440,7 +425,7 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetCSRFToken(out string Token))
 			{
-				LoginFailedProcedure($"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
+				LoginFailedProcedure(LA, $"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
 				await AccountManager.LogoutAccount(Username);
 				return;
 			}
@@ -449,7 +434,7 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetAuthTicket(out string Ticket))
 			{
-				LoginFailedProcedure("ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
+				LoginFailedProcedure(LA, "ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
 				return;
 			}
 
@@ -521,7 +506,7 @@ namespace RBXUptimeBot.Classes
 				var job = AccountManager.ActiveJobs.Find(item => item.Jid == PlaceID);
 				if (job == null)
 				{
-					LoginFailedProcedure($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
+					LoginFailedProcedure(LA, $"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
 					return;
 				}
 
@@ -545,17 +530,29 @@ namespace RBXUptimeBot.Classes
 						await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})"));
 						return;
 					}
-					Process pid = null;
-					while (pid == null) {
-						pid = await GetNewPId();
-						await Task.Delay(TimeSpan.FromSeconds(1));
+					Process pid = await Wait4Roblox();
+					if (pid == null) {
+						throw new Exception($"Something wrong with this roblox instance: Bloxstrap cannot launch roblox. {Username}");
 					}
 					IsActive = pid.Id;
 
-					Task errorcheck = Task.Run(async () => { 
-						await Task.Delay(TimeSpan.FromSeconds(AccountManager.General.Get<int>("LaunchDelay")));
-						if (pid.MainWindowTitle != "Roblox") {
-							throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open": pid.MainWindowTitle)}), {this.Username}.");
+					Task errorcheck = Task.Run(async () =>
+					{
+						int i = 0;
+						while (++i <= AccountManager.General.Get<int>("LaunchDelay") / 2)
+						{
+							await Task.Delay(TimeSpan.FromSeconds(2));
+							pid.Refresh();
+							if (pid.MainWindowTitle == "Roblox")
+							{
+								await Task.Delay(TimeSpan.FromSeconds(10));
+								break;
+							}
+							if (pid.MainWindowTitle == "Authentication Failed") break;
+						}
+						if (pid.MainWindowTitle != "Roblox")
+						{
+							throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open" : pid.MainWindowTitle)}), {this.Username}.");
 						}
 					});
 
@@ -578,28 +575,33 @@ namespace RBXUptimeBot.Classes
 						AccountManager.AllRunningAccounts.Add(ret);
 					}
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
-					semaphore.Release();
 					await errorcheck;
+
+					try { semaphore.Release(); } catch { }
+					LA.EndProcess();
 					Launcher.WaitForExit();
 				}
 				catch (Exception x)
 				{
+					LA.EndProcess();
 					if (Launcher != null)
 					{
 						AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == Launcher.Id);
 						job.ProcessList.RemoveAll(item => item.PID == Launcher.Id);
 						this.LeaveServer();
 					}
-					semaphore.Release();
+					try { semaphore.Release(); } catch { }
 					this.IsActive = 0;
 					Logger.Error($"Error: {x.Message}", x);
 				}
 			});
 		}
 
-		private async void LoginFailedProcedure(string text) {
-			semaphore.Release();
+		private async void LoginFailedProcedure(LaunchAutomation LA, string text)
+		{
+			try { semaphore.Release(); } catch { }
 			await AccountManager.LogService.CreateAsync(Logger.Error(text));
+			LA.EndProcess();
 			IsActive = 0;
 		}
 
@@ -624,15 +626,6 @@ namespace RBXUptimeBot.Classes
 				AccountManager.LogService.CreateAsync(Logger.Error($"Failed to kill process {process}", e));
 			}
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
-		}
-
-		static async Task<Process> GetNewPId() {
-			var processes = Process.GetProcessesByName("RobloxPlayerBeta");
-			foreach (var process in processes) {
-				if (AccountManager.AllRunningAccounts.Find(acc => acc.PID == process.Id) == null)
-					return process;
-			}
-			return null;
 		}
 
 		public async void AdjustWindowPosition()

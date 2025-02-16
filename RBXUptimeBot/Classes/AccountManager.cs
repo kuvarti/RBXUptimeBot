@@ -141,6 +141,7 @@ namespace RBXUptimeBot.Classes
 			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
 			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
 			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
+			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
 
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 
@@ -346,6 +347,7 @@ namespace RBXUptimeBot.Classes
 					});
 				}
 			});
+			SaveAccounts();
 			return $"{i} accounts logged out.";
 		}
 
