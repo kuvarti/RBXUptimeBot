@@ -31,4 +31,16 @@
     <PackageReference Include="Yove.Proxy" Version="1.1.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="main.py">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Proxies\proxy1.ppx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Proxies\proxy2.ppx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
