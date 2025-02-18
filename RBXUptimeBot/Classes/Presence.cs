@@ -32,7 +32,7 @@ namespace RBXUptimeBot.Classes
                 foreach (var Presence in Data["userPresences"].ToObject<List<UserPresence>>())
                     if (AccountManager.AccountsList.FirstOrDefault(acc => acc.UserID == Presence.userId) is Account account)
                     {
-                        account.Presence = Presence;
+                        //account.Presence = Presence;
 
                         Updated.Add(account);
                     }

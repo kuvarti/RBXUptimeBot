@@ -177,13 +177,9 @@ namespace RBXUptimeBot.Classes
 					account = exists;
 					exists.SecurityToken = SecurityToken;
 					exists.Password = Password;
-					exists.LastUse = DateTime.Now;
 				}
 				else
-				{
-					account.LastUse = DateTime.Now;
 					AccountsList.Add(account);
-				}
 				SaveAccounts(true);
 				return account;
 			}
@@ -248,14 +244,7 @@ namespace RBXUptimeBot.Classes
 				var Header = new ReadOnlySpan<byte>(BackupData, 0, Cryptography.RAMHeader.Length);
 			}
 
-			if (AccountsList.Count > 0)
-			{
-				LastValidAccount = AccountsList[0];
-
-				foreach (Account account in AccountsList)
-					if (account.LastUse > LastValidAccount.LastUse)
-						LastValidAccount = account;
-			}
+			LastValidAccount = AccountsList[0];
 		}
 
 		public static bool UpdateMultiRoblox()

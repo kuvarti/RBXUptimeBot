@@ -23,8 +23,6 @@ namespace RBXUptimeBot.Classes
 		public bool Valid;
 		public string SecurityToken;
 		public string Username { get; set; }
-		public DateTime startTime { get; } //!
-		public DateTime LastUse { get; set; }
 		public int IsActive { get; set; } = 0;
 		private string _Password = "";
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
@@ -32,11 +30,8 @@ namespace RBXUptimeBot.Classes
 		public long UserID;
 		public Dictionary<string, string> Fields = new Dictionary<string, string>();
 		public DateTime LastAttemptedRefresh;
-		[JsonIgnore] public DateTime PinUnlocked;
 		[JsonIgnore] public DateTime TokenSet;
-		[JsonIgnore] public DateTime LastAppLaunch;
 		[JsonIgnore] public string CSRFToken;
-		[JsonIgnore] public UserPresence Presence;
 
 		[DllImport("user32.dll", SetLastError = true)]
 		static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
@@ -68,7 +63,6 @@ namespace RBXUptimeBot.Classes
 		public Account(string Cookie, string AccountJSON = null)
 		{
 			SecurityToken = Cookie;
-			startTime = DateTime.Now;
 			AccountJSON ??= AccountManager.MainClient.Execute(MakeRequest("my/account/json", Method.Get)).Content;
 
 			if (!string.IsNullOrEmpty(AccountJSON) && Utilities.TryParseJson(AccountJSON, out AccountJson Data))
@@ -77,8 +71,6 @@ namespace RBXUptimeBot.Classes
 				UserID = Data.UserId;
 
 				Valid = true;
-
-				LastUse = DateTime.Now;
 
 				AccountManager.LastValidAccount = this;
 			}
@@ -127,7 +119,6 @@ namespace RBXUptimeBot.Classes
 			if (result != null)
 			{
 				Token = (string)result.Value;
-				LastUse = DateTime.Now;
 
 				AccountManager.LastValidAccount = this;
 				AccountManager.SaveAccounts();
@@ -149,9 +140,6 @@ namespace RBXUptimeBot.Classes
 				return false;
 			}
 
-			if (DateTime.Now < PinUnlocked)
-				return true;
-
 			RestRequest request = MakeRequest("v1/account/pin/", Method.Get).AddHeader("Referer", "https://www.roblox.com/");
 
 			RestResponse response = AccountManager.AuthClient.Execute(request);
@@ -168,39 +156,6 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
-		public bool UnlockPin(string Pin)
-		{
-			if (Pin.Length != 4) return false;
-			if (CheckPin(true)) return true;
-
-			if (!GetCSRFToken(out string Token)) return false;
-
-			RestRequest request = MakeRequest("v1/account/pin/unlock", Method.Post)
-				.AddHeader("Referer", "https://www.roblox.com/")
-				.AddHeader("X-CSRF-TOKEN", Token)
-				.AddHeader("Content-Type", "application/x-www-form-urlencoded")
-				.AddParameter("pin", Pin);
-
-			RestResponse response = AccountManager.AuthClient.Execute(request);
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
-			{
-				JObject pinInfo = JObject.Parse(response.Content);
-
-				if (pinInfo["isEnabled"].Value<bool>() && pinInfo["unlockedUntil"].Value<int>() > 0)
-					PinUnlocked = DateTime.Now.AddSeconds(pinInfo["unlockedUntil"].Value<int>());
-
-				if (PinUnlocked > DateTime.Now)
-				{
-					//MessageBox.Show("Pin unlocked for 5 minutes", "Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-					return true;
-				}
-			}
-
-			return false;
-		}
-
 		public async Task<JToken> GetMobileInfo()
 		{
 			RestRequest DataRequest = MakeRequest("mobileapi/userinfo", Method.Get);
@@ -213,45 +168,8 @@ namespace RBXUptimeBot.Classes
 			return null;
 		}
 
-		public bool SetFollowPrivacy(int Privacy)
-		{
-			if (!CheckPin()) return false;
-			if (!GetCSRFToken(out string Token)) return false;
-
-			RestRequest request = MakeRequest("account/settings/follow-me-privacy", Method.Post)
-				.AddHeader("Referer", "https://www.roblox.com/my/account")
-				.AddHeader("X-CSRF-TOKEN", Token)
-				.AddHeader("Content-Type", "application/x-www-form-urlencoded");
-
-			switch (Privacy)
-			{
-				case 0:
-					request.AddParameter("FollowMePrivacy", "All");
-					break;
-				case 1:
-					request.AddParameter("FollowMePrivacy", "Followers");
-					break;
-				case 2:
-					request.AddParameter("FollowMePrivacy", "Following");
-					break;
-				case 3:
-					request.AddParameter("FollowMePrivacy", "Friends");
-					break;
-				case 4:
-					request.AddParameter("FollowMePrivacy", "NoOne");
-					break;
-			}
-
-			RestResponse response = AccountManager.MainClient.Execute(request);
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK) return true;
-
-			return false;
-		}
-
 		public bool ChangeEmail(string Password, string NewEmail)
 		{
-			if (!CheckPin()) return false;
 			if (!GetCSRFToken(out string Token)) return false;
 
 			RestRequest request = MakeRequest("v1/email", Method.Post)
@@ -270,7 +188,6 @@ namespace RBXUptimeBot.Classes
 
 		public bool LogOutOfOtherSessions(bool Internal = false)
 		{
-			if (!CheckPin(Internal)) return false;
 			if (!GetCSRFToken(out string Token)) return false;
 
 			RestRequest request = MakeRequest("authentication/signoutfromallsessionsandreauthenticate", Method.Post)
@@ -291,80 +208,6 @@ namespace RBXUptimeBot.Classes
 				return true;
 			}
 			return false;
-		}
-
-		public RestResponse BlockUserId(string UserID, bool SkipPinCheck = false, HttpListenerContext Context = null, bool Unblock = false)
-		{
-			if (Context != null) Context.Response.StatusCode = 401;
-			if (!SkipPinCheck && !CheckPin(true)) throw new Exception("Pin Locked");
-			if (!GetCSRFToken(out string Token)) throw new Exception("Invalid X-CSRF-Token");
-
-			RestRequest blockReq = MakeRequest($"v1/users/{UserID}/{(Unblock ? "unblock" : "block")}", Method.Post).AddHeader("X-CSRF-TOKEN", Token);
-
-			RestResponse blockRes = AccountManager.AccountClient.Execute(blockReq);
-
-			Logger.Information($"Block Response for {UserID} | Unblocking: {Unblock}: [{blockRes.StatusCode}] {blockRes.Content}");
-
-			if (Context != null)
-				Context.Response.StatusCode = (int)blockRes.StatusCode;
-
-			return blockRes;
-		}
-
-		public RestResponse UnblockUserId(string UserID, bool SkipPinCheck = false, HttpListenerContext Context = null) => BlockUserId(UserID, SkipPinCheck, Context, true);
-
-		public bool UnblockEveryone(out string Response)
-		{
-			if (!CheckPin(true)) { Response = "Pin is Locked"; return false; }
-
-			RestResponse response = GetBlockedList();
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
-			{
-				Task.Run(async () =>
-				{
-					JObject List = JObject.Parse(response.Content);
-
-					if (List.ContainsKey("blockedUsers"))
-					{
-						foreach (var User in List["blockedUsers"])
-						{
-							if (!UnblockUserId(User["userId"].Value<string>(), true).IsSuccessful)
-							{
-								await Task.Delay(20000);
-
-								UnblockUserId(User["userId"].Value<string>(), true);
-
-								if (!CheckPin(true))
-									break;
-							}
-						}
-					}
-				});
-
-				Response = "Unblocking Everyone";
-
-				return true;
-			}
-
-			Response = "Failed to unblock everyone";
-
-			return false;
-		}
-
-		public RestResponse GetBlockedList(HttpListenerContext Context = null)
-		{
-			if (Context != null) Context.Response.StatusCode = 401;
-
-			if (!CheckPin(true)) throw new Exception("Pin is Locked");
-
-			RestRequest request = MakeRequest($"v1/users/get-detailed-blocked-users", Method.Get);
-
-			RestResponse response = AccountManager.AccountClient.Execute(request);
-
-			if (Context != null) Context.Response.StatusCode = (int)response.StatusCode;
-
-			return response;
 		}
 
 		public bool ParseAccessCode(RestResponse response, out string Code)
@@ -613,7 +456,6 @@ namespace RBXUptimeBot.Classes
 			try
 			{
 				this.IsActive = 0;
-				this.LastUse = DateTime.Now;
 				if (process != 0)
 				{
 					var proc = Process.GetProcessById(process);

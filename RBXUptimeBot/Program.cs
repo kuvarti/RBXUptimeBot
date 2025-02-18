@@ -37,3 +37,5 @@ app.MapControllers();
 AccountManager.AccManagerLoad();
 
 app.Run();
+
+Console.WriteLine("\nYou can now use program!");

@@ -13,6 +13,8 @@
     <PackageReference Include="cef.redist.x86" Version="109.1.11" />
     <PackageReference Include="CefSharp.Common" Version="109.1.110" />
     <PackageReference Include="CefSharp.WinForms" Version="109.1.110" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
+    <PackageReference Include="Google.Apis.Sheets.v4" Version="1.68.0.3658" />
     <PackageReference Include="libsodium-net" Version="0.10.0" />
     <PackageReference Include="log4net" Version="3.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.0" />

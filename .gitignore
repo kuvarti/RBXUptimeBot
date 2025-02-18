@@ -8,6 +8,7 @@
 *AccountData.json.backup
 proxies.txt
 *RAMSettings.ini
+*.ppx
 
 # dotenv files
 .env
