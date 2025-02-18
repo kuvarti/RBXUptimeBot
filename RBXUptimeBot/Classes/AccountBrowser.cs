@@ -241,6 +241,10 @@ namespace RBXUptimeBot.Classes
 						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
 						break;
 					};
+					if (page.Url == "https://www.roblox.com/login/securityNotification") {
+						await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} needs email for login."));
+						break;
+					}
 					await Task.Delay(TimeSpan.FromSeconds(2));
 					active += 2;
 				}
