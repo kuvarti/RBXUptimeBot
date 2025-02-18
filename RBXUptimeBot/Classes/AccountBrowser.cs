@@ -19,6 +19,7 @@ using WebSocketSharp;
 using Yove.Proxy;
 using System.Drawing;
 using PuppeteerSharp.Helpers;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace RBXUptimeBot.Classes
 {
@@ -27,6 +28,22 @@ namespace RBXUptimeBot.Classes
 		public static BrowserFetcher Fetcher = new BrowserFetcher(Product.Chrome);
 
 		//private static Dictionary<int, Vector2> ScreenGrid;
+		public class LoginResult
+		{
+			public void Ok()
+			{
+				Success = true;
+				Message = default(string);
+			}
+			public void Fail(string _)
+			{
+				Success = false;
+				Message = _;
+			}
+
+			public bool Success { get; set; }
+			public string Message { get; set; }
+		}
 
 		private readonly Dictionary<string, string> Images = new Dictionary<string, string>();
 		private readonly HashSet<string> Solved = new HashSet<string>();
@@ -123,7 +140,7 @@ namespace RBXUptimeBot.Classes
 
 					using (var Handler = new HttpClientHandler() { Proxy = Proxy })
 					using (var Client = new HttpClient(Handler) { Timeout = TimeSpan.FromMilliseconds(Timeout) })
-						try { (await Client.GetAsync("https://auth.roblox.com/")).EnsureSuccessStatusCode(); } 
+						try { (await Client.GetAsync("https://auth.roblox.com/")).EnsureSuccessStatusCode(); }
 						catch (Exception e)
 						{
 							if (proxyError.Length > 1) proxyError += ",";
@@ -186,9 +203,14 @@ namespace RBXUptimeBot.Classes
 					await page.EvaluateExpressionAsync(script);
 		}
 
-		public async Task Login(string Username = "", string Password = "", string[] Arguments = null) => await LaunchBrowser("https://roblox.com/login", Arguments: Arguments, PostNavigation: async (page) => await LoginTask(page, Username, Password));
+		public async Task<LoginResult> Login(string Username = "", string Password = "", string[] Arguments = null)
+		{
+			var ret = new LoginResult { Success = false, Message = "Unknown" };
+			await LaunchBrowser("https://roblox.com/login", Arguments: Arguments, PostNavigation: async (page) => await LoginTask(page, ret, Username, Password));
+			return ret;
+		}
 
-		public async Task LoginTask(Page page, string Username = "", string Password = "")
+		public async Task LoginTask(Page page, LoginResult result, string Username = "", string Password = "")
 		{
 			var tcs = new TaskCompletionSource<bool>();
 
@@ -204,12 +226,14 @@ namespace RBXUptimeBot.Classes
 							if (LoginData?["password"]?.Value<string>() is string password && !string.IsNullOrEmpty(password) && LoginData?["ctype"].Value<string>() is string loginType && loginType.ToLowerInvariant() == "username")
 								Password = password;
 							if ((await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
-								await AddAccount(Cookie);
+							{ await AddAccount(Cookie); result.Ok(); }
 						}
 						else if (Regex.IsMatch(Url.AbsolutePath, "/users/[0-9]+/two-step-verification/login") && (await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
-							await AddAccount(Cookie);
-						else
+						{ await AddAccount(Cookie); result.Ok(); }
+						else {
+							result.Fail($"Account {Username} cannot be logged in.");
 							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
+						}
 						tcs.TrySetResult(true);
 					}
 				}
@@ -238,10 +262,13 @@ namespace RBXUptimeBot.Classes
 				{
 					if (active >= max)
 					{
+						result.Fail($"Account {Username} login attempt timeout. (5 min)");
 						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
 						break;
 					};
-					if (page.Url == "https://www.roblox.com/login/securityNotification") {
+					if (page.Url == "https://www.roblox.com/login/securityNotification")
+					{
+						result.Fail($"Account {Username} needs email for login.");
 						await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} needs email for login."));
 						break;
 					}

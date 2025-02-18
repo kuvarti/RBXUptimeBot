@@ -69,7 +69,7 @@ namespace RBXUptimeBot.Classes
 
 		public static IniFile IniSettings;
 		public static IniSection General;
-		public static IniSection Developer;
+		public static IniSection Machine;
 		public static IniSection WebServer;
 		public static IniSection AccountControl;
 		public static IniSection Watcher;
@@ -95,7 +95,7 @@ namespace RBXUptimeBot.Classes
 		{
 			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
 			General = IniSettings.Section("General");
-			Developer = IniSettings.Section("Developer");
+			Machine = IniSettings.Section("Machine");
 			WebServer = IniSettings.Section("WebServer");
 			AccountControl = IniSettings.Section("AccountControl");
 			Watcher = IniSettings.Section("Watcher");
@@ -137,6 +137,9 @@ namespace RBXUptimeBot.Classes
 			AllRunningAccounts = new List<ActiveItem>();
 			ActiveJobs = new List<ActiveJob>();
 
+			if (!Machine.Exists("Name")) Machine.Set("Name","RoBot-1");
+			if (!Machine.Exists("ThisMachine")) Machine.Set("ThisMachine", "1");
+			if (!Machine.Exists("TotalMachine")) Machine.Set("TotalMachine", "1");
 			if (!General.Exists("JoinDelay")) General.Set("JoinDelay", "60");
 			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
 			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
