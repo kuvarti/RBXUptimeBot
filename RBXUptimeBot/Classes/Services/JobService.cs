@@ -121,20 +121,14 @@ namespace RBXUptimeBot.Classes.Services
 				{
 					break;
 				}
-				account.IsActive = 1;
-				items.Add(account);
+				if (account.Valid) {
+					account.IsActive = 1;
+					items.Add(account);
+				}
 			}
 			if (items.Count == 0)
 				Logger.Warning($"No more accounts to launch for job {jid}");
 			await AccountManager.LaunchAccounts(items, jid, "", new CancellationTokenSource());
-		}
-
-		public async Task RestartProcess(long jid, ActiveItem a)
-		{
-			if (a.Account.IsActive == 0) return;
-			a.Account.LeaveServer();
-			await Task.Delay(60000);
-			a.Account.JoinServer(jid);
 		}
 	}
 }

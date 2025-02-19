@@ -34,6 +34,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Update="service_account.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="main.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

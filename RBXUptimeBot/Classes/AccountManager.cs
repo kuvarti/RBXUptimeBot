@@ -18,6 +18,10 @@ using RBXUptimeBot.Models;
 using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using System.Configuration;
+using Google.Apis.Sheets.v4;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Services;
+using Google.Apis.Sheets.v4.Data;
 
 namespace RBXUptimeBot.Classes
 {
@@ -47,69 +51,55 @@ namespace RBXUptimeBot.Classes
 		public static List<ActiveJob> ActiveJobs;
 		public static List<Game> RecentGames;
 		public static Account LastValidAccount; // this is used for the Batch class since getting place details requires authorization, auto updates whenever an account is used
-		public static RestClient MainClient; //DIS
-		public static RestClient AvatarClient;
-		public static RestClient FriendsClient;
-		public static RestClient UsersClient;
+		
+		public static RestClient MainClient;
 		public static RestClient AuthClient;
-		public static RestClient EconClient;
-		public static RestClient AccountClient;
-		public static RestClient GameJoinClient;
+		public static RestClient UsersClient;
 		public static RestClient Web13Client;
+		public static SheetsService SheetsService;
 
 		public static IMongoDbService<LogEntry> LogService;
 
-		public static string CurrentVersion;
-		private readonly static DateTime startTime = DateTime.Now;
-
 		public static bool isDevelopment = false;
-		public static bool IsTeleport = false;
-		public static bool UseOldJoin = false;
-		public static bool ShuffleJobID = false;
 
 		public static IniFile IniSettings;
 		public static IniSection General;
 		public static IniSection Machine;
-		public static IniSection WebServer;
-		public static IniSection AccountControl;
 		public static IniSection Watcher;
 		public static IniSection Prompts;
+		public static IniSection GSheet;
 
 		private static Mutex rbxMultiMutex;
-		private readonly static object saveLock = new object();
-		private readonly static object rgSaveLock = new object();
-		public event EventHandler<GameArgs> RecentGameAdded;
-
-		private bool IsResettingPassword;
-		private bool IsDownloadingChromium;
-		private bool LaunchNext;
-		private CancellationTokenSource LauncherToken;
-
-		private static readonly byte[] Entropy = new byte[] { 0x52, 0x4f, 0x42, 0x4c, 0x4f, 0x58, 0x20, 0x41, 0x43, 0x43, 0x4f, 0x55, 0x4e, 0x54, 0x20, 0x4d, 0x41, 0x4e, 0x41, 0x47, 0x45, 0x52, 0x20, 0x7c, 0x20, 0x3a, 0x29, 0x20, 0x7c, 0x20, 0x42, 0x52, 0x4f, 0x55, 0x47, 0x48, 0x54, 0x20, 0x54, 0x4f, 0x20, 0x59, 0x4f, 0x55, 0x20, 0x42, 0x55, 0x59, 0x20, 0x69, 0x63, 0x33, 0x77, 0x30, 0x6c, 0x66 };
-
-		private static ReadOnlyMemory<byte> PasswordHash;
-		private readonly static string SaveFilePath = Path.Combine(Environment.CurrentDirectory, "AccountData.json");
-		private readonly static string RecentGamesFilePath = Path.Combine(Environment.CurrentDirectory, "RecentGames.json");
 
 		public static void AccManagerLoad()
 		{
-			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
-			General = IniSettings.Section("General");
-			Machine = IniSettings.Section("Machine");
-			WebServer = IniSettings.Section("WebServer");
-			AccountControl = IniSettings.Section("AccountControl");
-			Watcher = IniSettings.Section("Watcher");
-			Prompts = IniSettings.Section("Prompts");
+			AccountsList = new List<Account>();
+			AllRunningAccounts = new List<ActiveItem>();
+			ActiveJobs = new List<ActiveJob>();
 
-			MainClient = new RestClient("https://www.roblox.com/");
-			AvatarClient = new RestClient("https://avatar.roblox.com/");
-			AuthClient = new RestClient("https://auth.roblox.com/");
-			EconClient = new RestClient("https://economy.roblox.com/");
-			AccountClient = new RestClient("https://accountsettings.roblox.com/");
-			GameJoinClient = new RestClient(new RestClientOptions("https://gamejoin.roblox.com/") { UserAgent = "Roblox/WinInet" });
-			UsersClient = new RestClient("https://users.roblox.com");
-			FriendsClient = new RestClient("https://friends.roblox.com");
-			Web13Client = new RestClient("https://web.roblox.com/");
+			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
+			General	= IniSettings.Section("General");
+			Machine	= IniSettings.Section("Machine");
+			Watcher	= IniSettings.Section("Watcher");
+			Prompts	= IniSettings.Section("Prompts");
+			GSheet	= IniSettings.Section("GSheet");
+
+			MainClient	= new RestClient("https://www.roblox.com/");
+			AuthClient	= new RestClient("https://auth.roblox.com/");
+			UsersClient	= new RestClient("https://users.roblox.com");
+			Web13Client	= new RestClient("https://web.roblox.com/");
+
+			/* MACHINE */
+			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
+			if (!Machine.Exists("ThisMachine")) Machine.Set("ThisMachine", "1");
+			if (!Machine.Exists("TotalMachine")) Machine.Set("TotalMachine", "1");
+			if (!Machine.Exists("MaxAccountLoggedIn")) Machine.Set("MaxAccountLoggedIn", isDevelopment ? "2" : "50");
+			/* GENERAL */
+			if (!General.Exists("JoinDelay")) General.Set("JoinDelay", "60");
+			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
+			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
+			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
+			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
 
 			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
 			try
@@ -133,21 +123,7 @@ namespace RBXUptimeBot.Classes
 				Logger.Critical($"Error creating MongoDbService: {ex}");
 			}
 
-			AccountsList = new List<Account>();
-			AllRunningAccounts = new List<ActiveItem>();
-			ActiveJobs = new List<ActiveJob>();
-
-			if (!Machine.Exists("Name")) Machine.Set("Name","RoBot-1");
-			if (!Machine.Exists("ThisMachine")) Machine.Set("ThisMachine", "1");
-			if (!Machine.Exists("TotalMachine")) Machine.Set("TotalMachine", "1");
-			if (!General.Exists("JoinDelay")) General.Set("JoinDelay", "60");
-			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
-			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
-			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
-			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
-
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
-
 			if (!Prompts.Exists("VCPrompted") && (VCKey == null || (VCKey is RegistryKey && VCKey.GetValue("Bld") is int VCVersion && VCVersion < 32532)))
 				Task.Run(async () => // Make sure the user has the latest 2015-2022 vcredist installed
 				{
@@ -161,93 +137,78 @@ namespace RBXUptimeBot.Classes
 
 					Prompts.Set("VCPrompted", "1");
 				});
-			LoadAccounts();
+
 			UpdateMultiRoblox();
 			IniSettings.Save("RAMSettings.ini");
+			if (InitGoogleSheets()) LoadAccounts();
 		}
 
-		public void NextAccount() => LaunchNext = true;
-
-		public static Account AddAccount(string SecurityToken, string Password = "", string AccountJSON = null)
-		{
-			Account account = new Account(SecurityToken, AccountJSON);
-			if (account.Valid)
-			{
-				account.Password = Password;
-				Account exists = AccountsList.AsReadOnly().FirstOrDefault(acc => acc.UserID == account.UserID);
-				if (exists != null)
-				{
-					account = exists;
-					exists.SecurityToken = SecurityToken;
-					exists.Password = Password;
-				}
-				else
-					AccountsList.Add(account);
-				SaveAccounts(true);
-				return account;
+		private static bool InitGoogleSheets() {
+			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId")) {
+				LogService.CreateAsync(Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
+				return false;
 			}
-			return null;
-		}
 
-		public static void SaveAccounts(bool BypassRateLimit = false, bool BypassCountCheck = false)
-		{
-			if ((!BypassRateLimit && (DateTime.Now - startTime).Seconds < 2) || (!BypassCountCheck && AccountsList.Count == 0)) return;
-
-			lock (saveLock)
+			try
 			{
-				byte[] OldInfo = File.Exists(SaveFilePath) ? File.ReadAllBytes(SaveFilePath) : Array.Empty<byte>();
-				string SaveData = JsonConvert.SerializeObject(AccountsList);
-
-				FileInfo OldFile = new FileInfo(SaveFilePath);
-				FileInfo Backup = new FileInfo($"{SaveFilePath}.backup");
-
-				if (!Backup.Exists || (Backup.Exists && (DateTime.Now - Backup.LastWriteTime).TotalMinutes > 60 * 8))
-					File.WriteAllBytes(Backup.FullName, OldInfo);
-
-				File.WriteAllBytes(SaveFilePath, Encoding.UTF8.GetBytes(SaveData));
-			}
-		}
-
-		private static void LoadAccounts(byte[] Hash = null)
-		{
-			bool EnteredPassword = false;
-			byte[] Data = File.Exists(SaveFilePath) ? File.ReadAllBytes(SaveFilePath) : Array.Empty<byte>();
-
-			if (Data.Length > 0)
-			{
-				var Header = new ReadOnlySpan<byte>(Data, 0, Cryptography.RAMHeader.Length);
-
-				if (Header.SequenceEqual(Cryptography.RAMHeader))
+				string[] Scopes = { SheetsService.Scope.Spreadsheets };
+				using var stream = new FileStream(GSheet.Get<string>("APIKeyFile"), FileMode.Open, FileAccess.Read);
+				var credential = GoogleCredential.FromStream(stream).CreateScoped(Scopes);
+				SheetsService = new SheetsService(new BaseClientService.Initializer()
 				{
-					if (Hash == null) return;
+					HttpClientInitializer = credential,
+				});
+				var sheet = SheetsService.Spreadsheets.Get(GSheet.Get<string>("SpreadsheetId")).Execute();
+			}
+			catch (Exception ex){
+				LogService.CreateAsync(Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
+				return false;
+			}
+			return true;
+		}
 
-					Data = Cryptography.Decrypt(Data, Hash);
-					AccountsList = JsonConvert.DeserializeObject<List<Account>>(Encoding.UTF8.GetString(Data));
-					PasswordHash = new ReadOnlyMemory<byte>(ProtectedData.Protect(Hash, Array.Empty<byte>(), DataProtectionScope.CurrentUser));
+		private async static void LoadAccounts()
+		{
+			if (!GSheet.Exists("AccountsTableName")) {
+				LogService.CreateAsync(Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
+				return;
+			}
+			
+			try {
+				string SpreadsheetId = GSheet.Get<string>("SpreadsheetId");
+				string AccountsTableName = GSheet.Get<string>("AccountsTableName");
+				var response = SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute();
 
-					EnteredPassword = true;
+				var values = response.Values;
+				if (values == null &&  values.Count <= 0) {
+					LogService.CreateAsync(Logger.Information($"No account data found from google api.")).GetAwaiter().GetResult();
+					return;
 				}
-				else
-					try { AccountsList = JsonConvert.DeserializeObject<List<Account>>(Encoding.UTF8.GetString(ProtectedData.Unprotect(Data, Entropy, DataProtectionScope.CurrentUser))); }
-					catch (CryptographicException e)
-					{
-						try { AccountsList = JsonConvert.DeserializeObject<List<Account>>(Encoding.UTF8.GetString(Data)); }
-						catch
-						{
-							File.WriteAllBytes(SaveFilePath + ".bak", Data);
-							Logger.Error($"Failed to load accounts!\nA backup file was created in case the data can be recovered.\n\n{e.Message}", e);
+				for (int i = 1; i < values.Count; i++)
+				{
+					var item = values[i];
+					if (item[5].ToString() != "Standby" || item[5].ToString().StartsWith("Logged in on"))
+						continue;
+					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
+					if (account != null) await account.CheckTokenAndLoginIsNotValid();
+					else {
+						account = new Account() {
+							Row = Convert.ToInt16(item[0]),
+							Username = item[1]?.ToString(),
+							Password = item[2]?.ToString(),
+							SecurityToken = item[3]?.ToString()
+						};
+						await account.CheckTokenAndLoginIsNotValid();
+						if (account.Valid) {
+							AccountsList.Add(account);
 						}
 					}
+					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
+				}
 			}
-
-			AccountsList ??= new List<Account>();
-
-			if (!EnteredPassword && AccountsList.Count == 0 && File.Exists($"{SaveFilePath}.backup") && File.ReadAllBytes($"{SaveFilePath}.backup") is byte[] BackupData && BackupData.Length > 0)
-			{
-				var Header = new ReadOnlySpan<byte>(BackupData, 0, Cryptography.RAMHeader.Length);
+			catch (Exception ex) {
+				LogService.CreateAsync(Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
 			}
-
-			LastValidAccount = AccountsList[0];
 		}
 
 		public static bool UpdateMultiRoblox()
@@ -281,12 +242,6 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
-		public void CancelLaunching()
-		{
-			if (LauncherToken != null && !LauncherToken.IsCancellationRequested)
-				LauncherToken.Cancel();
-		}
-
 		public static async Task LoginAccount(string accounts)
 		{
 			string Combos = accounts;
@@ -314,7 +269,7 @@ namespace RBXUptimeBot.Classes
 					continue;
 				}
 
-				var accountBrowser = new AccountBrowser() { Index = i, Size = Size };
+				var accountBrowser = new AccountBrowser() { Size = Size };
 				await accountBrowser.Login(username, Combo.Substring(Combo.IndexOf(":") + 1));
 				await Task.Delay(TimeSpan.FromSeconds(60));
 			}
@@ -339,7 +294,7 @@ namespace RBXUptimeBot.Classes
 					});
 				}
 			});
-			SaveAccounts();
+			//SaveAccounts();
 			return $"{i} accounts logged out.";
 		}
 
