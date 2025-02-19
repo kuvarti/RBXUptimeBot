@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBXUptimeBot.Classes;
+using RBXUptimeBot.Models;
 using RestSharp;
 using System;
 using System.Collections.Generic;
@@ -18,14 +19,39 @@ using static RBXUptimeBot.Classes.RobloxWatcher;
 
 namespace RBXUptimeBot.Classes
 {
-	public class Account : IComparable<Account>
+	public partial class Account
 	{
-		public bool Valid;
-		public string SecurityToken;
-		public string Username { get; set; }
-		public int IsActive { get; set; } = 0;
-		private string _Password = "";
+		public bool Valid { get; set; }
+		private int _isActive;
+		public int IsActive
+		{
+			get => _isActive;
+			set {
+				_isActive = value;
+				string State = default(string);
+				if (value == 0) State = "Standby";
+				else if (value == 1) State = "Join Queue";
+				else if (value > 10) State = "In Job";
+				else State = "Unknown";
+				if (Valid ) _ = UpdateStatus(State);
+			}
+		}
+		public int Row { get; init; }
+		public string Username { get; init; }
+		public string Password { get; init; }
+		private string _Token;
+		public string SecurityToken
+		{
+			get => _Token;
+			set
+			{
+				_Token = value;
+				if (Valid) _ = UpdateToken(value);
+			}
+		}
+
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+		private static readonly SemaphoreSlim LoginSemaphore = new SemaphoreSlim(1, 1);
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
 		public Dictionary<string, string> Fields = new Dictionary<string, string>();
@@ -36,44 +62,33 @@ namespace RBXUptimeBot.Classes
 		[DllImport("user32.dll", SetLastError = true)]
 		static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
-		public int CompareTo(Account compareTo)
-		{
-			if (compareTo == null)
-				return 1;
-			else
-				return Group.CompareTo(compareTo.Group);
-		}
-
 		public string BrowserTrackerID;
-		public string Password
-		{
-			get => _Password;
-			set
-			{
-				if (value == null || value.Length > 5000)
-					return;
 
-				_Password = value;
-				AccountManager.SaveAccounts();
+		public Account() {
+			Valid = false;
+			IsActive = 0;
+		} //todo remove this
+
+		public async Task CheckTokenAndLoginIsNotValid()
+		{
+			LoginSemaphore.Wait();
+			if (!GetCSRFToken(out string _) && !GetAuthTicket(out string _))
+			{
+				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
+				var loginRes = await acbrowser.Login(Username, Password);
+				if (loginRes.Success) {
+					Valid = true;
+					SecurityToken = loginRes.Message;
+					await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+				}
+				else await UpdateState($"FAIL: {loginRes.Message}");
 			}
-		}
-
-		public Account() { }
-
-		public Account(string Cookie, string AccountJSON = null)
-		{
-			SecurityToken = Cookie;
-			AccountJSON ??= AccountManager.MainClient.Execute(MakeRequest("my/account/json", Method.Get)).Content;
-
-			if (!string.IsNullOrEmpty(AccountJSON) && Utilities.TryParseJson(AccountJSON, out AccountJson Data))
+			else
 			{
-				Username = Data.Name;
-				UserID = Data.UserId;
-
 				Valid = true;
-
-				AccountManager.LastValidAccount = this;
+				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
+			LoginSemaphore.Release();
 		}
 
 		public RestRequest MakeRequest(string url, Method method = Method.Get) => new RestRequest(url, method).AddCookie(".ROBLOSECURITY", SecurityToken, "/", ".roblox.com");
@@ -121,7 +136,7 @@ namespace RBXUptimeBot.Classes
 				Token = (string)result.Value;
 
 				AccountManager.LastValidAccount = this;
-				AccountManager.SaveAccounts();
+				//AccountManager.SaveAccounts();
 			}
 
 			CSRFToken = Token;
@@ -168,24 +183,6 @@ namespace RBXUptimeBot.Classes
 			return null;
 		}
 
-		public bool ChangeEmail(string Password, string NewEmail)
-		{
-			if (!GetCSRFToken(out string Token)) return false;
-
-			RestRequest request = MakeRequest("v1/email", Method.Post)
-				.AddHeader("Referer", "https://www.roblox.com/")
-				.AddHeader("X-CSRF-TOKEN", Token)
-				.AddHeader("Content-Type", "application/x-www-form-urlencoded")
-				.AddParameter("password", Password)
-				.AddParameter("emailAddress", NewEmail);
-
-			RestResponse response = AccountManager.AccountClient.Execute(request);
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
-				return true;
-			return false;
-		}
-
 		public bool LogOutOfOtherSessions(bool Internal = false)
 		{
 			if (!GetCSRFToken(out string Token)) return false;
@@ -203,7 +200,7 @@ namespace RBXUptimeBot.Classes
 				if (SToken != null)
 				{
 					SecurityToken = SToken.Value;
-					AccountManager.SaveAccounts(true);
+					//AccountManager.SaveAccounts(true);
 				}
 				return true;
 			}
@@ -272,8 +269,6 @@ namespace RBXUptimeBot.Classes
 				await AccountManager.LogoutAccount(Username);
 				return;
 			}
-			if (AccountManager.ShuffleJobID && string.IsNullOrEmpty(JobID))
-				JobID = await Utilities.GetRandomJobId(PlaceID);
 
 			if (!GetAuthTicket(out string Ticket))
 			{
@@ -363,7 +358,7 @@ namespace RBXUptimeBot.Classes
 					else if (FollowUser)
 						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestFollowUser&userId={PlaceID}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
 					else
-						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false{(AccountManager.IsTeleport ? "&isTeleport=true" : "")}")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
+						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
 
 					try { Launcher = Process.Start(LaunchInfo); }
 					catch (Exception e) { await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}")); }
@@ -374,7 +369,8 @@ namespace RBXUptimeBot.Classes
 						return;
 					}
 					Process pid = await Wait4Roblox();
-					if (pid == null) {
+					if (pid == null)
+					{
 						throw new Exception($"Something wrong with this roblox instance: Bloxstrap cannot launch roblox. {Username}");
 					}
 					IsActive = pid.Id;
@@ -509,41 +505,7 @@ namespace RBXUptimeBot.Classes
 			}
 		}
 
-		public string SetServer(long PlaceID, string JobID, out bool Successful)
-		{
-			Successful = false;
-
-			if (!GetCSRFToken(out string Token)) return $"ERROR: Account Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}";
-
-			if (string.IsNullOrEmpty(Token))
-				return "ERROR: Account Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)";
-
-			RestRequest request = MakeRequest("v1/join-game-instance", Method.Post).AddHeader("Content-Type", "application/json").AddJsonBody(new { gameId = JobID, placeId = PlaceID });
-
-			RestResponse response = AccountManager.GameJoinClient.Execute(request);
-
-			if (response.StatusCode == HttpStatusCode.OK)
-			{
-				Successful = true;
-				return Regex.IsMatch(response.Content, "\"joinScriptUrl\":[%s+]?null") ? response.Content : "Success";
-			}
-			else
-				return $"Failed {response.StatusCode}: {response.Content} {response.ErrorMessage}";
-		}
-
 		public string GetField(string Name) => Fields.ContainsKey(Name) ? Fields[Name] : string.Empty;
-		public void SetField(string Name, string Value) { Fields[Name] = Value; AccountManager.SaveAccounts(); }
-		public void RemoveField(string Name) { Fields.Remove(Name); AccountManager.SaveAccounts(); }
-	}
-
-	public class AccountJson
-	{
-		public long UserId { get; set; }
-		public string Name { get; set; }
-		public string DisplayName { get; set; }
-		public string UserEmail { get; set; }
-		public bool IsEmailVerified { get; set; }
-		public int AgeBracket { get; set; }
-		public bool UserAbove13 { get; set; }
+		public void SetField(string Name, string Value) { Fields[Name] = Value; /*AccountManager.SaveAccounts();*/ }
 	}
 }

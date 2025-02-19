@@ -9,6 +9,7 @@
 proxies.txt
 *RAMSettings.ini
 *.ppx
+*service_account.json
 
 # dotenv files
 .env

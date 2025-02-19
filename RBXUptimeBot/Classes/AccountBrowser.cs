@@ -30,10 +30,10 @@ namespace RBXUptimeBot.Classes
 		//private static Dictionary<int, Vector2> ScreenGrid;
 		public class LoginResult
 		{
-			public void Ok()
+			public void Ok(string _)
 			{
 				Success = true;
-				Message = default(string);
+				Message = _;
 			}
 			public void Fail(string _)
 			{
@@ -53,7 +53,6 @@ namespace RBXUptimeBot.Classes
 		public Browser browser;
 		public Page page;
 		public Vector2 Size = new Vector2(880, 740), Position;
-		public int Index = -1;
 
 		public AccountBrowser() { }
 
@@ -226,10 +225,10 @@ namespace RBXUptimeBot.Classes
 							if (LoginData?["password"]?.Value<string>() is string password && !string.IsNullOrEmpty(password) && LoginData?["ctype"].Value<string>() is string loginType && loginType.ToLowerInvariant() == "username")
 								Password = password;
 							if ((await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
-							{ await AddAccount(Cookie); result.Ok(); }
+							{ result.Ok(Cookie.Value); await browser.DisposeAsync(); }
 						}
 						else if (Regex.IsMatch(Url.AbsolutePath, "/users/[0-9]+/two-step-verification/login") && (await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
-						{ await AddAccount(Cookie); result.Ok(); }
+						{ result.Ok(Cookie.Value); await browser.DisposeAsync(); }
 						else {
 							result.Fail($"Account {Username} cannot be logged in.");
 							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
@@ -275,7 +274,6 @@ namespace RBXUptimeBot.Classes
 					await Task.Delay(TimeSpan.FromSeconds(2));
 					active += 2;
 				}
-				//TODO check url
 				if (!page.IsClosed) page.CloseAsync();
 			}
 			catch (Exception ex)
@@ -298,22 +296,6 @@ namespace RBXUptimeBot.Classes
 					page.RequestFinished -= Page_RequestFinished;
 				}
 			}
-		}
-
-		private async Task AddAccount(CookieParam SecurityToken)
-		{
-			if (Proxy == null)
-				AccountManager.AddAccount(SecurityToken.Value, Password);
-			else
-			{
-				await page.WaitForNavigationAsync();
-				var a = AccountManager.AddAccount(SecurityToken.Value, Password, await page.EvaluateFunctionAsync<string>("() => { return fetch('/my/account/json').then(x=>x.text()); }"));
-				await AccountManager.LogService.CreateAsync(Logger.Information($"Account '{a.Username}' is logged in."));
-			}
-
-			Password = null;
-
-			await browser.DisposeAsync();
 		}
 	}
 

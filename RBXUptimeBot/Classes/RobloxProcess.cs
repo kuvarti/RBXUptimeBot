@@ -51,7 +51,7 @@ namespace RBXUptimeBot.Classes
             WaitForExitTimer = new System.Timers.Timer(500);
             WaitForExitTimer.Elapsed += (s, e) =>
             {
-                if (AccountManager.Watcher.Get<bool>(" ExitIfNoConnection") && AccountManager.Watcher.Get<double>("NoConnectionTimeout") is double Timeout && Timeout > 0 && !IsConnected && (DateTime.Now - DisconnectedTime).TotalSeconds is double Seconds && Seconds > Timeout)
+                if (AccountManager.Watcher.Get<bool>("ExitIfNoConnection") && AccountManager.Watcher.Get<double>("NoConnectionTimeout") is double Timeout && Timeout > 0 && !IsConnected && (DateTime.Now - DisconnectedTime).TotalSeconds is double Seconds && Seconds > Timeout)
                     KillProcess($"Lost connection for more than {Seconds} second(s)");
 
                 try
