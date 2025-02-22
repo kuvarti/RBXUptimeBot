@@ -43,6 +43,9 @@
     <None Update="main.py">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="proxies.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Proxies\proxy1.ppx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

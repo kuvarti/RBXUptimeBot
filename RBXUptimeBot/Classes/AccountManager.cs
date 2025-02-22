@@ -99,6 +99,7 @@ namespace RBXUptimeBot.Classes
 			if (!General.Exists("LaunchDelay")) General.Set("LaunchDelay", "60");
 			if (!General.Exists("UseProxies")) General.Set("UseProxies", "true");
 			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
+			if (!General.Exists("Proxifier-Path")) General.Set("Proxifier-Path", "C:\\Program Files (x86)\\Proxifier\\Proxifier.exe");
 			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
 
 			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
@@ -140,6 +141,7 @@ namespace RBXUptimeBot.Classes
 
 			UpdateMultiRoblox();
 			IniSettings.Save("RAMSettings.ini");
+			LaunchAutomation.EndProxifiers();
 			if (InitGoogleSheets()) LoadAccounts();
 		}
 
@@ -187,7 +189,8 @@ namespace RBXUptimeBot.Classes
 				for (int i = 1; i < values.Count; i++)
 				{
 					var item = values[i];
-					if (item[5].ToString() != "Standby" || item[5].ToString().StartsWith("Logged in on"))
+					if (//item[5].ToString() != "Standby" || //!(item[5].ToString() != $"Logged in on {Machine.Get<string>("Name")}") ||
+						item[5].ToString().StartsWith("FAIL:"))
 						continue;
 					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
