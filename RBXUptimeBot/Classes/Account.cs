@@ -75,19 +75,25 @@ namespace RBXUptimeBot.Classes
 			if (!GetCSRFToken(out string _) && !GetAuthTicket(out string _))
 			{
 				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
+
 				var loginRes = await acbrowser.Login(Username, Password);
-				if (loginRes.Success) {
+				if (loginRes.Success)
+				{
 					Valid = true;
 					SecurityToken = loginRes.Message;
 					await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 				}
-				else await UpdateState($"FAIL: {loginRes.Message}");
+				else {
+					SecurityToken = "";
+					await UpdateState($"FAIL: {loginRes.Message}");
+				}
 			}
 			else
 			{
 				Valid = true;
 				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
+			if (Valid) IsActive = 0;
 			LoginSemaphore.Release();
 		}
 
