@@ -141,10 +141,10 @@ namespace RBXUptimeBot.Classes
 
 			UpdateMultiRoblox();
 			IniSettings.Save("RAMSettings.ini");
-			ProxifierService.EndProxifiers();
 			if (InitGoogleSheets())
 			{
-				ProxifierService.LoadProxyList();
+				ProxifierService.EndProxifiers();
+				Task.Run(() => { ProxifierService.LoadProxyList(); });
 				LoadAccounts();
 			}
 		}

@@ -46,10 +46,7 @@
     <None Update="proxies.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Proxies\proxy1.ppx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Proxies\proxy2.ppx">
+    <None Update="Proxies\Template.ppx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

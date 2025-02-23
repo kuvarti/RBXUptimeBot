@@ -51,7 +51,6 @@ namespace RBXUptimeBot.Classes
 		}
 
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
-		private static readonly SemaphoreSlim LoginSemaphore = new SemaphoreSlim(1, 1);
 		private ProxifierService PS;
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
@@ -74,7 +73,7 @@ namespace RBXUptimeBot.Classes
 
 		public async Task CheckTokenAndLoginIsNotValid()
 		{
-			LoginSemaphore.Wait();
+			PS.LaunchProcess();
 			if (!GetCSRFToken(out string _) && !GetAuthTicket(out string _))
 			{
 				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
@@ -97,7 +96,7 @@ namespace RBXUptimeBot.Classes
 				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
 			if (Valid) IsActive = 0;
-			LoginSemaphore.Release();
+			PS.EndProcess();
 		}
 
 		public RestRequest MakeRequest(string url, Method method = Method.Get) => new RestRequest(url, method).AddCookie(".ROBLOSECURITY", SecurityToken, "/", ".roblox.com");
@@ -137,47 +136,18 @@ namespace RBXUptimeBot.Classes
 			}
 
 			Parameter result = response.Headers.FirstOrDefault(x => x.Name == "x-csrf-token");
-
 			string Token = string.Empty;
 
 			if (result != null)
 			{
 				Token = (string)result.Value;
-
 				AccountManager.LastValidAccount = this;
-				//AccountManager.SaveAccounts();
 			}
 
 			CSRFToken = Token;
 			TokenSet = DateTime.Now;
 			Result = Token;
-
 			return !string.IsNullOrEmpty(Result);
-		}
-
-		public bool CheckPin(bool Internal = false)
-		{
-			if (!GetCSRFToken(out _))
-			{
-				//if (!Internal) MessageBox.Show("Invalid Account Session!", "Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-				return false;
-			}
-
-			RestRequest request = MakeRequest("v1/account/pin/", Method.Get).AddHeader("Referer", "https://www.roblox.com/");
-
-			RestResponse response = AccountManager.AuthClient.Execute(request);
-
-			if (response.IsSuccessful && response.StatusCode == HttpStatusCode.OK)
-			{
-				JObject pinInfo = JObject.Parse(response.Content);
-
-				if (!pinInfo["isEnabled"].Value<bool>() || (pinInfo["unlockedUntil"].Type != JTokenType.Null && pinInfo["unlockedUntil"].Value<int>() > 0)) return true;
-			}
-
-			//if (!Internal) MessageBox.Show("Pin required!", "Account Manager", MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-			return false;
 		}
 
 		public async Task<JToken> GetMobileInfo()
@@ -263,8 +233,7 @@ namespace RBXUptimeBot.Classes
 
 		public async Task JoinServer(long PlaceID, string JobID = "", bool FollowUser = false, bool JoinVIP = false, bool Internal = false) // oh god i am not refactoring everything to be async im sorry
 		{
-			ProxifierService LA = new ProxifierService();
-			LA.LaunchProcess();
+			PS.LaunchProcess();
 			await Wait4Proxyfier();
 			if (string.IsNullOrEmpty(BrowserTrackerID))
 			{
@@ -274,14 +243,14 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetCSRFToken(out string Token))
 			{
-				LoginFailedProcedure(LA, $"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
+				LoginFailedProcedure($"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
 				await AccountManager.LogoutAccount(Username);
 				return;
 			}
 
 			if (!GetAuthTicket(out string Ticket))
 			{
-				LoginFailedProcedure(LA, "ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
+				LoginFailedProcedure("ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
 				return;
 			}
 
@@ -353,7 +322,7 @@ namespace RBXUptimeBot.Classes
 				var job = AccountManager.ActiveJobs.Find(item => item.Jid == PlaceID);
 				if (job == null)
 				{
-					LoginFailedProcedure(LA, $"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
+					LoginFailedProcedure($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
 					return;
 				}
 
@@ -426,12 +395,12 @@ namespace RBXUptimeBot.Classes
 					await errorcheck;
 
 					try { semaphore.Release(); } catch { }
-					LA.EndProcess();
+					PS.EndProcess();
 					Launcher.WaitForExit();
 				}
 				catch (Exception x)
 				{
-					LA.EndProcess();
+					PS.EndProcess();
 					if (Launcher != null)
 					{
 						AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == Launcher.Id);
@@ -445,11 +414,11 @@ namespace RBXUptimeBot.Classes
 			});
 		}
 
-		private async void LoginFailedProcedure(ProxifierService LA, string text)
+		private async void LoginFailedProcedure(string text)
 		{
 			try { semaphore.Release(); } catch { }
 			await AccountManager.LogService.CreateAsync(Logger.Error(text));
-			LA.EndProcess();
+			PS.EndProcess();
 			IsActive = 0;
 		}
 

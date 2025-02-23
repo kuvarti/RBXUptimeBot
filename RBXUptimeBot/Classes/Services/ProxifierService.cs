@@ -31,7 +31,7 @@ namespace RBXUptimeBot.Classes.Services
 		};
 
 		private Proxy _Proxy;
-		private Process proxifierProcess;
+		private static Process proxifierProcess;
 
 		public ProxifierService(string _proxyId) {
 			_Proxy = Proxies.Find(p => p.ProxyId == _proxyId);
@@ -59,20 +59,6 @@ namespace RBXUptimeBot.Classes.Services
 		public bool IsValid => _Proxy != null && _Proxy.ProxyIP != null;
 		public bool IsRunning => proxifierProcess != null && !proxifierProcess.HasExited;
 
-		// Proxies klasöründen rastgele bir profil seçer.
-		private string GetRandomProxy()
-		{
-			string proxiesDirectory = ProxyPath;
-			string[] files = Directory.GetFiles(proxiesDirectory);
-			if (files.Length <= 0)
-			{
-				AccountManager.LogService.CreateAsync(Logger.Error("There is no proxy profile."));
-				return null;
-			}
-			Random random = new Random();
-			int randomIndex = random.Next(files.Length);
-			return Path.GetFullPath(files[randomIndex]);
-		}
 		// Proxy Profile File Operations
 		private bool CreateProxyProfile() {
 			string templateFile = Path.Combine(ProxyPath, "Template.ppx");
@@ -83,19 +69,19 @@ namespace RBXUptimeBot.Classes.Services
 			if (!IsValid) return false;
 			DeleteProxyProfile();
 
-			node = xmlDoc.SelectSingleNode("Username");
+			node = xmlDoc.SelectSingleNode("//Username");
 			if (node != null) node.InnerText = _Proxy.ProxyUsername;
 
-			node = xmlDoc.SelectSingleNode("Password");
+			node = xmlDoc.SelectSingleNode("//Password");
 			if (node != null) node.InnerText = _Proxy.ProxyPassword;
 
-			node = xmlDoc.SelectSingleNode("Address");
+			node = xmlDoc.SelectSingleNode("//Address");
 			if (node != null) node.InnerText = _Proxy.ProxyIP;
 
-			node = xmlDoc.SelectSingleNode("Port");
+			node = xmlDoc.SelectSingleNode("//Port");
 			if (node != null) node.InnerText = _Proxy.ProxyPort;
 
-			xmlDoc.Save(TempProxyFile);
+			xmlDoc.Save(Path.Combine(ProxyPath, TempProxyFile));
 			return true;
 		}
 		private bool DeleteProxyProfile() {
@@ -144,7 +130,7 @@ namespace RBXUptimeBot.Classes.Services
 					return;
 				}
 
-				if (CreateProxyProfile())
+				if (!CreateProxyProfile())
 					return;
 
 				// Dinamik proxifier exe yolunu konfigürasyondan alıyoruz.
@@ -219,8 +205,9 @@ namespace RBXUptimeBot.Classes.Services
 				try
 				{
 					var response = AccountManager.SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute().Values;
-					foreach (var item in response)
+					for (int i = 1; i < response.Count; i++)
 					{
+						var item = response[i];
 						var exist = Proxies.Find(p => p.ProxyId == item[Columns["ID"]]);
 						Proxy tmp = new Proxy() { 
 							ProxyId = item[Columns["ID"]].ToString(),

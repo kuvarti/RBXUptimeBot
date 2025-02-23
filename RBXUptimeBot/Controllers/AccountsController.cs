@@ -56,7 +56,7 @@ namespace RBXUptimeBot.Controllers
 		public async Task<ActionResult<string>> LoginAccounts(string text)
 		{
 			int before = AccountManager.AccountsList.Count;
-			await AccountManager.LoginAccount(text);
+			//await AccountManager.LoginAccount(text);
 			return Ok($"Total logged in account count: '{AccountManager.AccountsList.Count}'. It Was {before} before");
 		}
 

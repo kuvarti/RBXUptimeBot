@@ -205,11 +205,8 @@ namespace RBXUptimeBot.Classes
 
 		public async Task<LoginResult> Login(string Username = "", string Password = "", string[] Arguments = null)
 		{
-			ProxifierService LA = new ProxifierService();
-			LA.LaunchProcess(); //proxifier 
 			var ret = new LoginResult { Success = false, Message = "Unknown" };
 			await LaunchBrowser("https://roblox.com/login", Arguments: Arguments, PostNavigation: async (page) => await LoginTask(page, ret, Username, Password));
-			LA.EndProcess();
 			return ret;
 		}
 
