@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using RBXUptimeBot.Classes;
+using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
 using RestSharp;
 using System;
@@ -52,6 +52,7 @@ namespace RBXUptimeBot.Classes
 
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
 		private static readonly SemaphoreSlim LoginSemaphore = new SemaphoreSlim(1, 1);
+		private ProxifierService PS;
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
 		public Dictionary<string, string> Fields = new Dictionary<string, string>();
@@ -64,9 +65,11 @@ namespace RBXUptimeBot.Classes
 
 		public string BrowserTrackerID;
 
-		public Account() {
+		public Account(string ProxyId) {
 			Valid = false;
 			IsActive = 0;
+
+			PS = new ProxifierService(ProxyId);
 		} //todo remove this
 
 		public async Task CheckTokenAndLoginIsNotValid()
@@ -260,7 +263,7 @@ namespace RBXUptimeBot.Classes
 
 		public async Task JoinServer(long PlaceID, string JobID = "", bool FollowUser = false, bool JoinVIP = false, bool Internal = false) // oh god i am not refactoring everything to be async im sorry
 		{
-			LaunchAutomation LA = new LaunchAutomation();
+			ProxifierService LA = new ProxifierService();
 			LA.LaunchProcess();
 			await Wait4Proxyfier();
 			if (string.IsNullOrEmpty(BrowserTrackerID))
@@ -442,7 +445,7 @@ namespace RBXUptimeBot.Classes
 			});
 		}
 
-		private async void LoginFailedProcedure(LaunchAutomation LA, string text)
+		private async void LoginFailedProcedure(ProxifierService LA, string text)
 		{
 			try { semaphore.Release(); } catch { }
 			await AccountManager.LogService.CreateAsync(Logger.Error(text));

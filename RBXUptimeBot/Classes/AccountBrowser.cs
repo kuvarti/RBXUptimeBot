@@ -20,6 +20,7 @@ using Yove.Proxy;
 using System.Drawing;
 using PuppeteerSharp.Helpers;
 using Microsoft.AspNetCore.Http.HttpResults;
+using RBXUptimeBot.Classes.Services;
 
 namespace RBXUptimeBot.Classes
 {
@@ -204,7 +205,7 @@ namespace RBXUptimeBot.Classes
 
 		public async Task<LoginResult> Login(string Username = "", string Password = "", string[] Arguments = null)
 		{
-			LaunchAutomation LA = new LaunchAutomation();
+			ProxifierService LA = new ProxifierService();
 			LA.LaunchProcess(); //proxifier 
 			var ret = new LoginResult { Success = false, Message = "Unknown" };
 			await LaunchBrowser("https://roblox.com/login", Arguments: Arguments, PostNavigation: async (page) => await LoginTask(page, ret, Username, Password));

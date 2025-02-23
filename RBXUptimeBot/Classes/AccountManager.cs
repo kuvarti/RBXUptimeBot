@@ -51,7 +51,7 @@ namespace RBXUptimeBot.Classes
 		public static List<ActiveJob> ActiveJobs;
 		public static List<Game> RecentGames;
 		public static Account LastValidAccount; // this is used for the Batch class since getting place details requires authorization, auto updates whenever an account is used
-		
+
 		public static RestClient MainClient;
 		public static RestClient AuthClient;
 		public static RestClient UsersClient;
@@ -78,16 +78,16 @@ namespace RBXUptimeBot.Classes
 			ActiveJobs = new List<ActiveJob>();
 
 			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
-			General	= IniSettings.Section("General");
-			Machine	= IniSettings.Section("Machine");
-			Watcher	= IniSettings.Section("Watcher");
-			Prompts	= IniSettings.Section("Prompts");
-			GSheet	= IniSettings.Section("GSheet");
+			General = IniSettings.Section("General");
+			Machine = IniSettings.Section("Machine");
+			Watcher = IniSettings.Section("Watcher");
+			Prompts = IniSettings.Section("Prompts");
+			GSheet = IniSettings.Section("GSheet");
 
-			MainClient	= new RestClient("https://www.roblox.com/");
-			AuthClient	= new RestClient("https://auth.roblox.com/");
-			UsersClient	= new RestClient("https://users.roblox.com");
-			Web13Client	= new RestClient("https://web.roblox.com/");
+			MainClient = new RestClient("https://www.roblox.com/");
+			AuthClient = new RestClient("https://auth.roblox.com/");
+			UsersClient = new RestClient("https://users.roblox.com");
+			Web13Client = new RestClient("https://web.roblox.com/");
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
@@ -141,12 +141,18 @@ namespace RBXUptimeBot.Classes
 
 			UpdateMultiRoblox();
 			IniSettings.Save("RAMSettings.ini");
-			LaunchAutomation.EndProxifiers();
-			if (InitGoogleSheets()) LoadAccounts();
+			ProxifierService.EndProxifiers();
+			if (InitGoogleSheets())
+			{
+				ProxifierService.LoadProxyList();
+				LoadAccounts();
+			}
 		}
 
-		private static bool InitGoogleSheets() {
-			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId")) {
+		private static bool InitGoogleSheets()
+		{
+			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId"))
+			{
 				LogService.CreateAsync(Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
 				return false;
 			}
@@ -160,9 +166,10 @@ namespace RBXUptimeBot.Classes
 				{
 					HttpClientInitializer = credential,
 				});
-				var sheet = SheetsService.Spreadsheets.Get(GSheet.Get<string>("SpreadsheetId")).Execute();
+				SheetsService.Spreadsheets.Get(GSheet.Get<string>("SpreadsheetId")).Execute();
 			}
-			catch (Exception ex){
+			catch (Exception ex)
+			{
 				LogService.CreateAsync(Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
 				return false;
 			}
@@ -171,18 +178,21 @@ namespace RBXUptimeBot.Classes
 
 		private async static void LoadAccounts()
 		{
-			if (!GSheet.Exists("AccountsTableName")) {
+			if (!GSheet.Exists("AccountsTableName"))
+			{
 				LogService.CreateAsync(Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
 				return;
 			}
-			
-			try {
+
+			try
+			{
 				string SpreadsheetId = GSheet.Get<string>("SpreadsheetId");
 				string AccountsTableName = GSheet.Get<string>("AccountsTableName");
 				var response = SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute();
 
 				var values = response.Values;
-				if (values == null &&  values.Count <= 0) {
+				if (values == null && values.Count <= 0)
+				{
 					LogService.CreateAsync(Logger.Information($"No account data found from google api.")).GetAwaiter().GetResult();
 					return;
 				}
@@ -194,22 +204,26 @@ namespace RBXUptimeBot.Classes
 						continue;
 					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
-					else {
-						account = new Account() {
+					else
+					{
+						account = new Account(item[6].ToString())
+						{
 							Row = Convert.ToInt16(item[0]),
 							Username = item[1]?.ToString(),
 							Password = item[2]?.ToString(),
 							SecurityToken = item[3]?.ToString()
 						};
 						await account.CheckTokenAndLoginIsNotValid();
-						if (account.Valid) {
+						if (account.Valid)
+						{
 							AccountsList.Add(account);
 						}
 					}
 					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
 				}
 			}
-			catch (Exception ex) {
+			catch (Exception ex)
+			{
 				LogService.CreateAsync(Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
 			}
 		}
@@ -243,39 +257,6 @@ namespace RBXUptimeBot.Classes
 			UserId = -1;
 
 			return false;
-		}
-
-		public static async Task LoginAccount(string accounts)
-		{
-			string Combos = accounts;
-			Logger.Information($"{DateTime.Now} attempt login accounts");
-
-			if (Combos == "/UC") return;
-
-			List<string> ComboList = new List<string>(Combos.Split('\n'));
-			if (ComboList.Count == 1) ComboList = new List<string>(Combos.Split('-'));
-
-			var Size = new System.Numerics.Vector2(455, 485);
-			//AccountBrowser.CreateGrid(Size);
-
-			for (int i = 0; i < ComboList.Count; i++)
-			{
-				string Combo = ComboList[i];
-
-				if (!Combo.Contains(':')) continue;
-
-				string username = Combo.Substring(0, Combo.IndexOf(':'));
-
-				if (AccountManager.AccountsList.Find(x => x.Username == username) != null)
-				{
-					Logger.Warning($"Account '{username}' already signed in.");
-					continue;
-				}
-
-				var accountBrowser = new AccountBrowser() { Size = Size };
-				await accountBrowser.Login(username, Combo.Substring(Combo.IndexOf(":") + 1));
-				await Task.Delay(TimeSpan.FromSeconds(60));
-			}
 		}
 
 		public static async Task<string> LogoutAccount(string accounts)

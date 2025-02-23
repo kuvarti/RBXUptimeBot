@@ -9,7 +9,8 @@ namespace RBXUptimeBot.Classes
 			{"Token", "D"},
 			{"Status", "E"},
 			{"State", "F"},
-			{"LastUpdate", "G"}
+			//{"Proxy", "G" }, This line just claims 'G' column and we dont change it.
+			{"LastUpdate", "H"}
 		};
 
 		private bool CheckINIparams()
