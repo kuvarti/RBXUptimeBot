@@ -87,7 +87,7 @@ namespace RBXUptimeBot.Classes
 				}
 				else {
 					SecurityToken = "";
-					await UpdateState($"FAIL: {loginRes.Message}");
+					await UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
 				}
 			}
 			else

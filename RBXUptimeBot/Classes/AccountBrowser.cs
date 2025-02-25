@@ -31,19 +31,21 @@ namespace RBXUptimeBot.Classes
 		//private static Dictionary<int, Vector2> ScreenGrid;
 		public class LoginResult
 		{
-			public void Ok(string _)
+			public void Ok(string _msg)
 			{
 				Success = true;
-				Message = _;
+				Message = _msg;
 			}
-			public void Fail(string _)
+			public void Fail(string _msg, string _err)
 			{
 				Success = false;
-				Message = _;
+				Message = _msg;
+				ErrorType = _err;
 			}
 
 			public bool Success { get; set; }
 			public string Message { get; set; }
+			public string ErrorType { get; set; }
 		}
 
 		private readonly Dictionary<string, string> Images = new Dictionary<string, string>();
@@ -231,7 +233,7 @@ namespace RBXUptimeBot.Classes
 						else if (Regex.IsMatch(Url.AbsolutePath, "/users/[0-9]+/two-step-verification/login") && (await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
 						{ result.Ok(Cookie.Value); await browser.DisposeAsync(); }
 						else {
-							result.Fail($"Account {Username} cannot be logged in.");
+							result.Fail($"Account {Username} cannot be logged in.", "FAIL");
 							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
 						}
 						tcs.TrySetResult(true);
@@ -264,13 +266,13 @@ namespace RBXUptimeBot.Classes
 				{
 					if (active >= max)
 					{
-						result.Fail($"Account {Username} login attempt timeout. (5 min)");
+						result.Fail($"Account {Username} login attempt timeout. (5 min)", "FAIL");
 						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
 						break;
 					};
 					if (page.Url == "https://www.roblox.com/login/securityNotification")
 					{
-						result.Fail($"Account {Username} needs email for login.");
+						result.Fail($"Account {Username} needs email for login.", "FATAL");
 						await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} needs email for login."));
 						break;
 					}
