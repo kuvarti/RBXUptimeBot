@@ -245,6 +245,8 @@ namespace RBXUptimeBot.Classes
 			}
 
 			page.RequestFinished += Page_RequestFinished;
+			//page.Console
+			//page.PageError
 
 			await page.EvaluateExpressionAsync(@"document.body.classList.remove(""light-theme"");document.body.classList.add(""dark-theme"");");
 

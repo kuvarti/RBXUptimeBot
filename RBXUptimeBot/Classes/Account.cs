@@ -96,6 +96,7 @@ namespace RBXUptimeBot.Classes
 				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
 			if (Valid) IsActive = 0;
+			else SecurityToken = "";
 			PS.EndProcess();
 		}
 

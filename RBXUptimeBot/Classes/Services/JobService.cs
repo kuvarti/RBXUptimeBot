@@ -90,7 +90,7 @@ namespace RBXUptimeBot.Classes.Services
 				foreach (var item in job.ProcessList)
 				{
 					try
-					{
+					{//todo investigate item.PID goes 
 						if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox")
 						{
 							AccountManager.LogService.CreateAsync(Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'"));
