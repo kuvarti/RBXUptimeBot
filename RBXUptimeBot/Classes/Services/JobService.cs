@@ -10,7 +10,8 @@ namespace RBXUptimeBot.Classes.Services
 	{
 		public readonly IMongoDbService<JobEntry> _JobService;
 
-		public JobService() {
+		public JobService()
+		{
 			var configuration = new ConfigurationBuilder()
 				.SetBasePath(Directory.GetCurrentDirectory())
 				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
@@ -25,7 +26,8 @@ namespace RBXUptimeBot.Classes.Services
 		{
 			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
 				return $"Not enough accounts to start the job.({AccountManager.AccountsList.Count})";
-			var job = new JobEntry() {
+			var job = new JobEntry()
+			{
 				placeId = jId.ToString(),
 				AccCount = accCount,
 				StartTime = DateTime.Now,
@@ -87,12 +89,20 @@ namespace RBXUptimeBot.Classes.Services
 			{
 				foreach (var item in job.ProcessList)
 				{
-					if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox") {
-						AccountManager.LogService.CreateAsync(Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'"));
-						accounts.Add(item.Account);
+					try
+					{
+						if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox")
+						{
+							AccountManager.LogService.CreateAsync(Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'"));
+							accounts.Add(item.Account);
+						}
+					}
+					catch (Exception ex) {
+						AccountManager.LogService.CreateAsync(Logger.Critical($"Acccount {item.Account.Username} pid goes bblank unexpectedlyf"));
 					}
 				}
-				foreach (var account in accounts){
+				foreach (var account in accounts)
+				{
 					account.LeaveServer();
 					job.ProcessList.RemoveAll(ritem => ritem.Account == account);
 				}
@@ -121,7 +131,8 @@ namespace RBXUptimeBot.Classes.Services
 				{
 					break;
 				}
-				if (account.Valid) {
+				if (account.Valid)
+				{
 					account.IsActive = 1;
 					items.Add(account);
 				}
