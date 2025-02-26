@@ -47,6 +47,7 @@ namespace RBXUptimeBot.Classes
 			{
 				_Token = value;
 				if (Valid) _ = UpdateToken(value);
+				if (value.IsNullOrEmpty()) _ = UpdateStatus(string.Empty);
 			}
 		}
 

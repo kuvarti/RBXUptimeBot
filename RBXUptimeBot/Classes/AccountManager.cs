@@ -214,10 +214,7 @@ namespace RBXUptimeBot.Classes
 							SecurityToken = item[3]?.ToString()
 						};
 						await account.CheckTokenAndLoginIsNotValid();
-						if (account.Valid)
-						{
-							AccountsList.Add(account);
-						}
+						if (account.Valid) AccountsList.Add(account);
 					}
 					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
 				}

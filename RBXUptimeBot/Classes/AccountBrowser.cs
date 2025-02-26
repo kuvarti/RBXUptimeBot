@@ -232,7 +232,8 @@ namespace RBXUptimeBot.Classes
 						}
 						else if (Regex.IsMatch(Url.AbsolutePath, "/users/[0-9]+/two-step-verification/login") && (await page.GetCookiesAsync("https://roblox.com/")).FirstOrDefault(Cookie => Cookie.Name == ".ROBLOSECURITY") is CookieParam Cookie)
 						{ result.Ok(Cookie.Value); await browser.DisposeAsync(); }
-						else {
+						else
+						{
 							result.Fail($"Account {Username} cannot be logged in.", "FAIL");
 							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
 						}
@@ -247,8 +248,16 @@ namespace RBXUptimeBot.Classes
 			}
 
 			page.RequestFinished += Page_RequestFinished;
-			//page.Console
-			//page.PageError
+
+			page.Console += async (s, e) =>
+			{
+				if (e.Message.Type != ConsoleType.Error) return;
+				Logger.Information($"{e.Message.Text}\n{e.Message.Type}\n{e.Message.Location}");
+			};
+			page.PageError += async (s, e) =>
+			{
+				Logger.Error(e.Message);
+			};
 
 			await page.EvaluateExpressionAsync(@"document.body.classList.remove(""light-theme"");document.body.classList.add(""dark-theme"");");
 
