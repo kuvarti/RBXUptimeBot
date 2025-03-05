@@ -35,7 +35,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 AccountManager.AccManagerLoad();
+Console.CancelKeyPress += (sender, eventArgs) => AccountManager.ExitProtocol();// ctrl c
+AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => AccountManager.ExitProtocol();// regular exit
 
 app.Run();
-
-Console.WriteLine("\nYou can now use program!");
