@@ -53,10 +53,11 @@ namespace RBXUptimeBot.Classes
 		public static Account LastValidAccount; // this is used for the Batch class since getting place details requires authorization, auto updates whenever an account is used
 
 		public static RestClient MainClient;
-		public static RestClient AuthClient;
 		public static RestClient UsersClient;
 		public static RestClient Web13Client;
 		public static SheetsService SheetsService;
+
+		public static int maxAcc;
 
 		public static IMongoDbService<LogEntry> LogService;
 
@@ -85,7 +86,6 @@ namespace RBXUptimeBot.Classes
 			GSheet = IniSettings.Section("GSheet");
 
 			MainClient = new RestClient("https://www.roblox.com/");
-			AuthClient = new RestClient("https://auth.roblox.com/");
 			UsersClient = new RestClient("https://users.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
 
@@ -93,6 +93,7 @@ namespace RBXUptimeBot.Classes
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
 			if (!Machine.Exists("ThisMachine")) Machine.Set("ThisMachine", "1");
 			if (!Machine.Exists("TotalMachine")) Machine.Set("TotalMachine", "1");
+			if (!Machine.Exists("ReLoginEveryTime")) Machine.Set("ReLoginEveryTime", "false");
 			if (!Machine.Exists("MaxAccountLoggedIn")) Machine.Set("MaxAccountLoggedIn", isDevelopment ? "2" : "50");
 			/* GENERAL */
 			if (!General.Exists("JoinDelay")) General.Set("JoinDelay", "60");
@@ -141,12 +142,27 @@ namespace RBXUptimeBot.Classes
 
 			UpdateMultiRoblox();
 			IniSettings.Save("RAMSettings.ini");
+		}
+
+		public static void ExitProtocol(){
+			AccountsList.ForEach(ac =>
+			{
+				ac.LeaveServer();
+				ac.LogOutAcc();
+			});
+			System.Environment.Exit(0);
+		}
+
+		public static (bool, string) InitAccounts()
+		{
 			if (InitGoogleSheets())
 			{
 				ProxifierService.EndProxifiers();
 				Task.Run(() => { ProxifierService.LoadProxyList(); });
 				LoadAccounts();
 			}
+			else return (false, "Program cannot make connection with Spreadsheet.");
+			return (true, "Account are loading.");
 		}
 
 		private static bool InitGoogleSheets()
@@ -196,6 +212,7 @@ namespace RBXUptimeBot.Classes
 					LogService.CreateAsync(Logger.Information($"No account data found from google api.")).GetAwaiter().GetResult();
 					return;
 				}
+				maxAcc = values.Count - 1;
 				for (int i = 1; i < values.Count; i++)
 				{
 					var item = values[i];
@@ -206,12 +223,12 @@ namespace RBXUptimeBot.Classes
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
 					else
 					{
-						account = new Account(item[6].ToString())
+						account = new Account(item[7].ToString())
 						{
 							Row = Convert.ToInt16(item[0]),
 							Username = item[1]?.ToString(),
 							Password = item[2]?.ToString(),
-							SecurityToken = item[3]?.ToString()
+							SecurityToken = item[4]?.ToString()
 						};
 						await account.CheckTokenAndLoginIsNotValid();
 						if (account.Valid) AccountsList.Add(account);

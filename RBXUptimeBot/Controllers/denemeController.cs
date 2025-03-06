@@ -35,5 +35,12 @@ namespace RBXUptimeBot.Controllers
 			});
 			return Ok();
 		}
+
+		[HttpPost("close")]
+		public async Task<ActionResult> Close()
+		{
+			AccountManager.ExitProtocol();
+			return Ok();
+		}
 	}
 }
