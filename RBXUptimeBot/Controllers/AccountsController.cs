@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using RBXUptimeBot.Classes;
 using RBXUptimeBot.Models;
 using System.Net;
@@ -11,9 +12,11 @@ namespace RBXUptimeBot.Controllers
 	[ApiController]
 	public class AccountsController : ControllerBase
 	{
+		private bool _LoginProcess;
 		private readonly ILogger<AccountsController> _logger;
 		public AccountsController(ILogger<AccountsController> logger)
 		{
+			_LoginProcess = false;
 			_logger = logger;
 		}
 
@@ -52,20 +55,22 @@ namespace RBXUptimeBot.Controllers
 			});
 		}
 
-		[HttpPost("LoginAccounts/{text}")]
-		public async Task<ActionResult<string>> LoginAccounts(string text)
+		[HttpPost("StartAccountsLogin")]
+		public async Task<ActionResult> StartAccountsLogin()
 		{
-			int before = AccountManager.AccountsList.Count;
-			//await AccountManager.LoginAccount(text);
-			return Ok($"Total logged in account count: '{AccountManager.AccountsList.Count}'. It Was {before} before");
+			if (_LoginProcess) return Ok("Login Process already begin.");
+			var res = AccountManager.InitAccounts();
+			if (res.Item1) return Ok(res.Item2);
+			else return BadRequest(res.Item2);
 		}
 
-		[HttpPost("LogoutAccounts/{text}")]
-		public async Task<ActionResult<string>> LogoutAccounts(string text)
+		[HttpGet("GetAccountLoginLogs")]
+		public async Task<ActionResult> GetAccountLoginLogs()
 		{
-			if (string.IsNullOrEmpty(text))
-				return BadRequest("Please provide a username to logout.");
-			return Ok(await AccountManager.LogoutAccount(text));
+			string res = $"There is {AccountManager.maxAcc} account fetched from sheet\n";
+			res += $"{AccountManager.AccountsList.Count} of them logged in.\n";
+			res += $"{AccountManager.Machine.Get<int>("MaxAccountLoggedIn")} account will be logged in en of the progress.\n";
+			return Ok(res);
 		}
 	}
 }
