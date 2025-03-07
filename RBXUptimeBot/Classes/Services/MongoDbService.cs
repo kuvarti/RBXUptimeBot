@@ -72,7 +72,6 @@ namespace RBXUptimeBot.Classes.Services
 				return default(T);
 		}
 
-		// TODO may create random id string
 		public async Task CreateAsync(T entity)
 		{
 			if (_collection != null)

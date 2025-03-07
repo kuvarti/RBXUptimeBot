@@ -6,11 +6,11 @@ namespace RBXUptimeBot.Classes
 	public partial class Account
 	{
 		static readonly Dictionary<string, string> Columns = new Dictionary<string, string> {
-			{"Token", "D"},
-			{"Status", "E"},
-			{"State", "F"},
-			//{"Proxy", "G" }, This line just claims 'G' column and we dont change it.
-			{"LastUpdate", "H"}
+			{"Token", "E"},
+			{"Status", "F"},
+			{"State", "G"},
+			//{"Proxy", "H" }, This line just claims 'G' column and we dont change it.
+			{"LastUpdate", "I"}
 		};
 
 		private bool CheckINIparams()
