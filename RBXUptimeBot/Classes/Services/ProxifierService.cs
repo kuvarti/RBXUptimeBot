@@ -8,7 +8,7 @@ using System.Xml;
 
 namespace RBXUptimeBot.Classes.Services
 {
-	class Proxy {
+	public class Proxy {
 		public string ProxyId { get; init; }
 		public string ProxyIP { get; init; }
 		public string ProxyPort { get; init; }
@@ -31,6 +31,7 @@ namespace RBXUptimeBot.Classes.Services
 		};
 
 		private Proxy _Proxy;
+		public Proxy Proxy { get => _Proxy; }
 		private static Process proxifierProcess;
 
 		public ProxifierService(string _proxyId) {
@@ -152,6 +153,7 @@ namespace RBXUptimeBot.Classes.Services
 				try
 				{
 					proxifierProcess = Process.Start(psi);
+					Task.Delay(TimeSpan.FromSeconds(1));
 				}
 				catch (Exception ex)
 				{

@@ -26,14 +26,15 @@ namespace RBXUptimeBot.Classes
 		public int IsActive
 		{
 			get => _isActive;
-			set {
+			set
+			{
 				_isActive = value;
 				string State = default(string);
 				if (value == 0) State = "Standby";
 				else if (value == 1) State = "Join Queue";
 				else if (value > 10) State = "In Job";
 				else State = "Unknown";
-				if (Valid ) _ = UpdateStatus(State);
+				if (Valid) _ = UpdateStatus(State);
 			}
 		}
 		public int Row { get; init; }
@@ -63,20 +64,29 @@ namespace RBXUptimeBot.Classes
 		[DllImport("user32.dll", SetLastError = true)]
 		static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
 
+		private RestClient AuthClient;
 		public string BrowserTrackerID;
 
-		public Account(string ProxyId) {
+		public Account(string ProxyId)
+		{
 			Valid = false;
 			IsActive = 0;
 
 			PS = new ProxifierService(ProxyId);
-		} //todo remove this
+			AuthClient = new RestClient(new RestClientOptions("https://auth.roblox.com/")
+			{
+				Proxy = new WebProxy($"socks5://{PS.Proxy.ProxyIP}:{PS.Proxy.ProxyPort}", false)
+				{
+					Credentials = new NetworkCredential(PS.Proxy.ProxyUsername, PS.Proxy.ProxyPassword)
+				}
+			});
+		}
 
 		public async Task CheckTokenAndLoginIsNotValid()
 		{
-			PS.LaunchProcess();
-			if (!GetCSRFToken(out string _) && !GetAuthTicket(out string _))
+			if (AccountManager.Machine.Get<bool>("ReLoginEveryTime") || (!GetCSRFToken(out string _) && !GetAuthTicket(out string _)))
 			{
+				PS.LaunchProcess();
 				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
 
 				var loginRes = await acbrowser.Login(Username, Password);
@@ -86,10 +96,12 @@ namespace RBXUptimeBot.Classes
 					SecurityToken = loginRes.Message;
 					await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 				}
-				else {
+				else
+				{
 					SecurityToken = "";
 					await UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
 				}
+				PS.EndProcess();
 			}
 			else
 			{
@@ -98,7 +110,6 @@ namespace RBXUptimeBot.Classes
 			}
 			if (Valid) IsActive = 0;
 			else SecurityToken = "";
-			PS.EndProcess();
 		}
 
 		public RestRequest MakeRequest(string url, Method method = Method.Get) => new RestRequest(url, method).AddCookie(".ROBLOSECURITY", SecurityToken, "/", ".roblox.com");
@@ -109,9 +120,11 @@ namespace RBXUptimeBot.Classes
 
 			if (!GetCSRFToken(out string Token)) return false;
 
-			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post).AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP").AddHeader("Content-type", "application/json"); ;
+			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post)
+				.AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP")
+				.AddHeader("Content-type", "application/json");
 
-			RestResponse response = AccountManager.AuthClient.Execute(request);
+			RestResponse response = AuthClient.Execute(request);
 
 			Parameter TicketHeader = response.Headers.FirstOrDefault(x => x.Name == "rbx-authentication-ticket");
 
@@ -124,12 +137,14 @@ namespace RBXUptimeBot.Classes
 
 			return false;
 		}
-
+		//TODO these two can be combined into one method???
 		public bool GetCSRFToken(out string Result)
 		{
-			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP").AddHeader("Content-type", "application/json");
+			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post)
+				.AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP")
+				.AddHeader("Content-type", "application/json");
 
-			RestResponse response = AccountManager.AuthClient.Execute(request);
+			RestResponse response = AuthClient.Execute(request);
 
 			if (response.StatusCode != HttpStatusCode.Forbidden)
 			{
@@ -444,6 +459,13 @@ namespace RBXUptimeBot.Classes
 				AccountManager.LogService.CreateAsync(Logger.Error($"Failed to kill process {process}", e));
 			}
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
+		}
+
+		// this gonna be change with new version
+		public void LogOutAcc()
+		{
+			UpdateStatus(string.Empty);
+			UpdateState("Standby");
 		}
 
 		public async void AdjustWindowPosition()

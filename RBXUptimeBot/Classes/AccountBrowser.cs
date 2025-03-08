@@ -21,6 +21,8 @@ using System.Drawing;
 using PuppeteerSharp.Helpers;
 using Microsoft.AspNetCore.Http.HttpResults;
 using RBXUptimeBot.Classes.Services;
+using System.Reflection.Metadata;
+using System.Reactive.Disposables;
 
 namespace RBXUptimeBot.Classes
 {
@@ -252,11 +254,23 @@ namespace RBXUptimeBot.Classes
 			page.Console += async (s, e) =>
 			{
 				if (e.Message.Type != ConsoleType.Error) return;
-				Logger.Information($"{e.Message.Text}\n{e.Message.Type}\n{e.Message.Location}");
+				if (e.Message.Text.Contains("409"))
+				{
+					result.Fail($"Roblox returned conflict Error. Login for this account aborting.", "FAIL"); await browser.DisposeAsync();
+				}
 			};
-			page.PageError += async (s, e) =>
+
+			page.FrameAttached += async (s, e) =>
 			{
-				Logger.Error(e.Message);
+				try
+				{
+
+					if (await page.WaitForSelectorAsync("#user-agreements-checker-modal", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
+						await page.EvaluateExpressionAsync("document.querySelector('.modal-button').click();"); // accept terms
+					else
+						await page.ClickAsync(".rostile-verify-button");
+				}
+				catch { }
 			};
 
 			await page.EvaluateExpressionAsync(@"document.body.classList.remove(""light-theme"");document.body.classList.add(""dark-theme"");");
@@ -278,13 +292,25 @@ namespace RBXUptimeBot.Classes
 						result.Fail($"Account {Username} login attempt timeout. (5 min)", "FAIL");
 						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
 						break;
-					};
+					}
+					;
 					if (page.Url == "https://www.roblox.com/login/securityNotification")
 					{
 						result.Fail($"Account {Username} needs email for login.", "FATAL");
 						await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} needs email for login."));
 						break;
 					}
+					try {
+						(await page.GetCookiesAsync()).ToList().ForEach(async (cookie) =>
+						{
+							if (cookie.Name == ".ROBLOSECURITY")
+							{
+								result.Ok(cookie.Value);
+								await browser.DisposeAsync();
+							}
+						});
+					} catch { }
+
 					await Task.Delay(TimeSpan.FromSeconds(2));
 					active += 2;
 				}
