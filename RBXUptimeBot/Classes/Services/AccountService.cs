@@ -7,10 +7,11 @@ namespace RBXUptimeBot.Classes
 	{
 		static readonly Dictionary<string, string> Columns = new Dictionary<string, string> {
 			{"Token", "E"},
-			{"Status", "F"},
-			{"State", "G"},
-			//{"Proxy", "H" }, This line just claims 'G' column and we dont change it.
-			{"LastUpdate", "I"}
+			{"TokenCreatedTime", "F"},
+			{"Status", "G"},
+			{"State", "H"},
+			//{"Proxy", "I" }, This line just claims 'G' column and we dont change it.
+			{"LastUpdate", "J"}
 		};
 
 		private bool CheckINIparams()
@@ -37,6 +38,24 @@ namespace RBXUptimeBot.Classes
 			await request.ExecuteAsync();
 		}
 
+		private async Task UpdateCell(List<ValueRange> actualRange)
+		{
+			if (!CheckINIparams())
+			{
+				await AccountManager.LogService.CreateAsync(Logger.Error("Google Sheet values cannot be updated.", new Exception(".INI file params is not setted")));
+				return;
+			}
+			actualRange.Add(await RegisterLastUpdate());
+			var batchUpdateRequest = new BatchUpdateValuesRequest
+			{
+				ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.RAW.ToString(),
+				Data = actualRange
+			};
+
+			var request = AccountManager.SheetsService.Spreadsheets.Values.BatchUpdate(batchUpdateRequest, AccountManager.GSheet.Get<string>("SpreadsheetId"));
+			await request.ExecuteAsync();
+		}
+
 		private async Task<ValueRange> CreateAccountsTableRange(string cell, object data)
 		{
 			return new ValueRange
@@ -48,7 +67,10 @@ namespace RBXUptimeBot.Classes
 
 		private async Task<ValueRange> RegisterLastUpdate() => await CreateAccountsTableRange($"{Columns["LastUpdate"]}{Row}", DateTime.Now.ToString("G"));
 
-		private async Task UpdateToken(string token) => await UpdateCell(await CreateAccountsTableRange($"{Columns["Token"]}{Row}", token));
+		private async Task UpdateToken(string token) => await UpdateCell(new List<ValueRange> {
+			await CreateAccountsTableRange($"{Columns["Token"]}{Row}", token),
+			await CreateAccountsTableRange($"{Columns["TokenCreatedTime"]}{Row}", DateTime.Now.ToString("G"))
+		});
 		private async Task UpdateState(string state) => await UpdateCell(await CreateAccountsTableRange($"{Columns["State"]}{Row}", state));
 		private async Task UpdateStatus(string status) => await UpdateCell(await CreateAccountsTableRange($"{Columns["Status"]}{Row}", status));
 	}

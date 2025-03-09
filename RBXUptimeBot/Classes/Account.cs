@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Google.Apis.Sheets.v4.Data;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
@@ -75,7 +76,7 @@ namespace RBXUptimeBot.Classes
 			PS = new ProxifierService(ProxyId);
 			AuthClient = new RestClient(new RestClientOptions("https://auth.roblox.com/")
 			{
-				Proxy = new WebProxy($"socks5://{PS.Proxy.ProxyIP}:{PS.Proxy.ProxyPort}", false)
+				Proxy = new WebProxy($"http://{PS.Proxy.ProxyIP}:{PS.Proxy.ProxyPort}", false)
 				{
 					Credentials = new NetworkCredential(PS.Proxy.ProxyUsername, PS.Proxy.ProxyPassword)
 				}
@@ -461,11 +462,12 @@ namespace RBXUptimeBot.Classes
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
 
-		// this gonna be change with new version
 		public void LogOutAcc()
 		{
-			UpdateStatus(string.Empty);
-			UpdateState("Standby");
+			UpdateCell(new List<ValueRange>{
+				CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
+				CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
+			}).GetAwaiter().GetResult();
 		}
 
 		public async void AdjustWindowPosition()
