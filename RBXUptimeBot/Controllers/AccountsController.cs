@@ -69,7 +69,7 @@ namespace RBXUptimeBot.Controllers
 		{
 			string res = $"There is {AccountManager.maxAcc} account fetched from sheet\n";
 			res += $"{AccountManager.AccountsList.Count} of them logged in.\n";
-			res += $"{AccountManager.Machine.Get<int>("MaxAccountLoggedIn")} account will be logged in en of the progress.\n";
+			res += $"{AccountManager.Machine.Get<int>("MaxAccountLoggedIn")} account will be logged in end of the progress if it possible.\n";
 			return Ok(res);
 		}
 	}

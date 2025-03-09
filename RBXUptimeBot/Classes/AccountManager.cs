@@ -144,7 +144,8 @@ namespace RBXUptimeBot.Classes
 			IniSettings.Save("RAMSettings.ini");
 		}
 
-		public static void ExitProtocol(){
+		public static void ExitProtocol()
+		{
 			AccountsList.ForEach(ac =>
 			{
 				ac.LeaveServer();
@@ -223,15 +224,21 @@ namespace RBXUptimeBot.Classes
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
 					else
 					{
-						account = new Account(item[7].ToString())
+						try
 						{
-							Row = Convert.ToInt16(item[0]),
-							Username = item[1]?.ToString(),
-							Password = item[2]?.ToString(),
-							SecurityToken = item[4]?.ToString()
-						};
-						await account.CheckTokenAndLoginIsNotValid();
-						if (account.Valid) AccountsList.Add(account);
+							account = new Account(item[8].ToString())
+							{
+								Row = Convert.ToInt16(item[0]),
+								Username = item[1]?.ToString(),
+								Password = item[2]?.ToString(),
+								SecurityToken = item[4]?.ToString()
+							};
+							await account.CheckTokenAndLoginIsNotValid();
+							if (account.Valid) AccountsList.Add(account);
+						}
+						catch (Exception ex) {
+							LogService.CreateAsync(Logger.Error($"Error while creating account.", ex)).GetAwaiter().GetResult();
+						}
 					}
 					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
 				}
