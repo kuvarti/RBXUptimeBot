@@ -254,7 +254,7 @@ namespace RBXUptimeBot.Classes
 			page.Console += async (s, e) =>
 			{
 				if (e.Message.Type != ConsoleType.Error) return;
-				if (e.Message.Text.Contains("409"))
+				if (e.Message.Text.Contains("409") || e.Message.Text.Contains("429"))
 				{
 					result.Fail($"Roblox returned conflict Error. Login for this account aborting.", "FAIL"); await browser.DisposeAsync();
 				}
@@ -264,13 +264,12 @@ namespace RBXUptimeBot.Classes
 			{
 				try
 				{
-
-					if (await page.WaitForSelectorAsync("#user-agreements-checker-modal", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
-						await page.EvaluateExpressionAsync("document.querySelector('.modal-button').click();"); // accept terms
-					else
-						await page.ClickAsync(".rostile-verify-button");
-				}
-				catch { }
+					if (await e.Frame.WaitForSelectorAsync("#user-agreements-checker-modal", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
+						await e.Frame.EvaluateExpressionAsync("document.querySelector('.modal-button').click();"); // at terms
+				} catch { }
+				try {
+					await e.Frame.ClickAsync(".rostile-verify-button"); //dont work ???
+				} catch { }
 			};
 
 			await page.EvaluateExpressionAsync(@"document.body.classList.remove(""light-theme"");document.body.classList.add(""dark-theme"");");
