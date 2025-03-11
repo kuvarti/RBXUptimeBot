@@ -254,7 +254,7 @@ namespace RBXUptimeBot.Classes
 			page.Console += async (s, e) =>
 			{
 				if (e.Message.Type != ConsoleType.Error) return;
-				if (e.Message.Text.Contains("409") || e.Message.Text.Contains("429"))
+				if (await page.WaitForSelectorAsync("#login-form-error", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
 				{
 					result.Fail($"Roblox returned conflict Error. Login for this account aborting.", "FAIL"); await browser.DisposeAsync();
 				}
