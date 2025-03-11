@@ -55,6 +55,7 @@ namespace RBXUptimeBot.Classes
 		public static RestClient MainClient;
 		public static RestClient UsersClient;
 		public static RestClient Web13Client;
+		public static RestClient AuthClient;
 		public static SheetsService SheetsService;
 
 		public static int maxAcc;
@@ -88,6 +89,7 @@ namespace RBXUptimeBot.Classes
 			MainClient = new RestClient("https://www.roblox.com/");
 			UsersClient = new RestClient("https://users.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
+			AuthClient = new RestClient("https://auth.roblox.com/");
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
