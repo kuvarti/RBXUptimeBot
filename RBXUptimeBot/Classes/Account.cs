@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -23,6 +24,7 @@ namespace RBXUptimeBot.Classes
 	public partial class Account
 	{
 		public bool Valid { get; set; }
+		private string _Ticket;
 		private int _isActive;
 		public int IsActive
 		{
@@ -54,6 +56,7 @@ namespace RBXUptimeBot.Classes
 		}
 
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
+		private static readonly SemaphoreSlim instancecheck = new SemaphoreSlim(1, 1);
 		private ProxifierService PS;
 		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
@@ -115,17 +118,17 @@ namespace RBXUptimeBot.Classes
 
 		public RestRequest MakeRequest(string url, Method method = Method.Get) => new RestRequest(url, method).AddCookie(".ROBLOSECURITY", SecurityToken, "/", ".roblox.com");
 
-		public bool GetAuthTicket(out string Ticket)
+		public bool GetAuthTicket(out string Ticket, bool useOriginal = false)
 		{
 			Ticket = string.Empty;
 
-			if (!GetCSRFToken(out string Token)) return false;
+			if (!GetCSRFToken(out string Token, useOriginal)) return false;
 
 			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post)
-				.AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP")
+				.AddHeader("X-CSRF-TOKEN", Token).AddHeader("Referer", "https://www.roblox.com/games/75965306756161/Color-io")
 				.AddHeader("Content-type", "application/json");
 
-			RestResponse response = AuthClient.Execute(request);
+			RestResponse response = useOriginal ? AccountManager.AuthClient.Execute(request) : AuthClient.Execute(request);
 
 			Parameter TicketHeader = response.Headers.FirstOrDefault(x => x.Name == "rbx-authentication-ticket");
 
@@ -139,13 +142,11 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 		//TODO these two can be combined into one method???
-		public bool GetCSRFToken(out string Result)
+		public bool GetCSRFToken(out string Result, bool useOriginal = false)
 		{
-			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post)
-				.AddHeader("Referer", "https://www.roblox.com/games/4924922222/Brookhaven-RP")
-				.AddHeader("Content-type", "application/json");
+			RestRequest request = MakeRequest("v1/authentication-ticket/", Method.Post).AddHeader("Referer", "https://www.roblox.com/games/75965306756161/Color-io").AddHeader("Content-type", "application/json"); ;
 
-			RestResponse response = AuthClient.Execute(request);
+			RestResponse response = useOriginal ? AccountManager.AuthClient.Execute(request) : AuthClient.Execute(request);
 
 			if (response.StatusCode != HttpStatusCode.Forbidden)
 			{
@@ -223,11 +224,37 @@ namespace RBXUptimeBot.Classes
 			{
 				var pl = Process.GetProcessesByName("Proxifier");
 				if (pl != null) p = pl.FirstOrDefault();
-				await Task.Delay(TimeSpan.FromSeconds(1));
+				await Task.Delay(TimeSpan.FromSeconds(5));
 			}
 		}
 
-		private async Task<Process> Wait4Roblox()
+		public async Task InstanceCheck()
+		{
+			await instancecheck.WaitAsync();
+			Process process = null;
+
+			try { process = Process.GetProcessById(this.IsActive); } catch { }
+			if (process != null) {
+				if (CheckTicket(process.GetCommandLine(), _Ticket)) {
+					instancecheck.Release();
+					return;	
+				}
+			}
+			else {
+				var ps = Process.GetProcessesByName("RobloxPlayerBeta");
+				foreach (var item in ps)
+				{
+					if (CheckTicket(process.GetCommandLine(), _Ticket))
+					{
+						this.IsActive = item.Id;
+						instancecheck.Release();
+						return;
+					}
+				}
+			}
+		}
+
+		private async Task<Process> Wait4Roblox(string ticket)
 		{
 			int i = 0, imax = AccountManager.General.Get<int>("BloxstrapTimeout");
 			while (true)
@@ -235,8 +262,10 @@ namespace RBXUptimeBot.Classes
 				var rbx = Process.GetProcessesByName("RobloxPlayerBeta");
 				foreach (var process in rbx)
 				{
-					if (AccountManager.AllRunningAccounts.Find(acc => acc.PID == process.Id) == null)
+					if (CheckTicket(process.GetCommandLine(), ticket))
+					{
 						return process;
+					}
 				}
 				i++; if (i > imax) break;
 				await Task.Delay(TimeSpan.FromSeconds(1));
@@ -259,14 +288,14 @@ namespace RBXUptimeBot.Classes
 				BrowserTrackerID = r.Next(100000, 175000).ToString() + r.Next(100000, 900000).ToString(); // oh god this is ugly
 			}
 
-			if (!GetCSRFToken(out string Token))
+			if (!GetCSRFToken(out string Token, true))
 			{
 				LoginFailedProcedure($"ERROR: Account {Username} Session Expired, re-add the account or try again. (Invalid X-CSRF-Token)\n{Token}");
 				await AccountManager.LogoutAccount(Username);
 				return;
 			}
 
-			if (!GetAuthTicket(out string Ticket))
+			if (!GetAuthTicket(out string Ticket, true))
 			{
 				LoginFailedProcedure("ERROR: Invalid Authentication Ticket, re-add the account or try again\n(Failed to get Authentication Ticket, Roblox has probably signed you out)");
 				return;
@@ -364,12 +393,11 @@ namespace RBXUptimeBot.Classes
 						await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})"));
 						return;
 					}
-					Process pid = await Wait4Roblox();
-					if (pid == null)
-					{
-						throw new Exception($"Something wrong with this roblox instance: Bloxstrap cannot launch roblox. {Username}");
-					}
+
+					Process pid = await Wait4Roblox(Ticket);
+					if (pid == null) throw new Exception($"Something wrong with this roblox instance: Bloxstrap cannot launch roblox. {Username}");
 					IsActive = pid.Id;
+					_Ticket = Ticket;
 
 					Task errorcheck = Task.Run(async () =>
 					{
@@ -385,30 +413,17 @@ namespace RBXUptimeBot.Classes
 							}
 							if (pid.MainWindowTitle == "Authentication Failed") break;
 						}
-						if (pid.MainWindowTitle != "Roblox")
-						{
-							throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open" : pid.MainWindowTitle)}), {this.Username}.");
-						}
+						if (pid.MainWindowTitle != "Roblox") throw new Exception($"Something wrong with this roblox instance: ({(pid.MainWindowTitle.IsNullOrEmpty() ? "Window, doesnt open" : pid.MainWindowTitle)}), {this.Username}.");
 					});
 
-					var isExist = job.ProcessList.Find(item => item.Account == this);
-					if (isExist != null)
+					ActiveItem ret = new ActiveItem()
 					{
-						isExist.PID = pid.Id;
-						isExist.StartTime = DateTime.Now;
-						AccountManager.AllRunningAccounts.Add(isExist);
-					}
-					else
-					{
-						ActiveItem ret = new ActiveItem()
-						{
-							Account = this,
-							PID = pid.Id,
-							StartTime = DateTime.Now
-						};
-						job.ProcessList.Add(ret);
-						AccountManager.AllRunningAccounts.Add(ret);
-					}
+						Account = this,
+						PID = pid.Id,
+						StartTime = DateTime.Now
+					};
+					job.ProcessList.AddOrChange(ret);
+					AccountManager.AllRunningAccounts.AddOrChange(ret);
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
 					await errorcheck;
 
@@ -439,6 +454,8 @@ namespace RBXUptimeBot.Classes
 			PS.EndProcess();
 			IsActive = 0;
 		}
+
+		private bool CheckTicket(string command, string ticket) => command.Contains(ticket);
 
 		public void LeaveServer(long jid = 0)
 		{
