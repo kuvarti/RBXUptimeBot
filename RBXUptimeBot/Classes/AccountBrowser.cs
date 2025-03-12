@@ -254,10 +254,14 @@ namespace RBXUptimeBot.Classes
 			page.Console += async (s, e) =>
 			{
 				if (e.Message.Type != ConsoleType.Error) return;
-				if (await page.WaitForSelectorAsync("#login-form-error", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
+				try
 				{
-					result.Fail($"Roblox returned conflict Error. Login for this account aborting.", "FAIL"); await browser.DisposeAsync();
+					if (await page.WaitForSelectorAsync("#login-form-error", new WaitForSelectorOptions() { Timeout = 5000 }) != null)
+					{
+						result.Fail($"Roblox returned conflict Error. Login for this account aborting.", "FAIL"); await browser.DisposeAsync();
+					}
 				}
+				catch { }
 			};
 
 			page.FrameAttached += async (s, e) =>

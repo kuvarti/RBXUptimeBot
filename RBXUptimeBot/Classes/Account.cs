@@ -88,9 +88,9 @@ namespace RBXUptimeBot.Classes
 
 		public async Task CheckTokenAndLoginIsNotValid()
 		{
-			if (AccountManager.Machine.Get<bool>("ReLoginEveryTime") || (!GetCSRFToken(out string _) && !GetAuthTicket(out string _)))
+			PS.LaunchProcess(); await Wait4Proxyfier();
+			if (AccountManager.Machine.Get<bool>("ReLoginEveryTime") || (!GetCSRFToken(out string _, true) && !GetAuthTicket(out string _, true)))
 			{
-				PS.LaunchProcess();
 				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
 
 				var loginRes = await acbrowser.Login(Username, Password);
@@ -105,13 +105,13 @@ namespace RBXUptimeBot.Classes
 					SecurityToken = "";
 					await UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
 				}
-				PS.EndProcess();
 			}
 			else
 			{
 				Valid = true;
 				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
+			PS.EndProcess();
 			if (Valid) IsActive = 0;
 			else SecurityToken = "";
 		}

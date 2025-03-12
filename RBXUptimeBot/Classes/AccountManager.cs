@@ -220,7 +220,7 @@ namespace RBXUptimeBot.Classes
 				{
 					var item = values[i];
 					if (//item[5].ToString() != "Standby" || //!(item[5].ToString() != $"Logged in on {Machine.Get<string>("Name")}") ||
-						item[5].ToString().StartsWith("FATAL:"))
+						item[7].ToString().StartsWith("FATAL:"))
 						continue;
 					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
