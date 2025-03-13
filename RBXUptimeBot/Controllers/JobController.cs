@@ -26,7 +26,7 @@ namespace RBXUptimeBot.Controllers
 			if (exist != null) {
 				exist.AccountCount = count;
 				exist.endTime = DateTime.Now.AddMinutes(endTime);
-				AccountManager.LogService.CreateAsync(Logger.Warning($"Job {text} is changed while running.\nNew Account Count: {count}\nNew endTime: {exist.endTime.ToString()}"));
+				Logger.Warning($"Job {text} is changed while running.\nNew Account Count: {count}\nNew endTime: {exist.endTime.ToString()}");
 				return BadRequest($"Job {text} already exist. changing parameters. Jon now end on {exist.endTime.ToString()}");
 			}
 			if (AccountManager.AccountsList.Count < 1)

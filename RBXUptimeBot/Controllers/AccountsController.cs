@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
 using RBXUptimeBot.Classes;
 using RBXUptimeBot.Models;
 using System.Net;
@@ -37,7 +37,7 @@ namespace RBXUptimeBot.Controllers
 		}
 
 		[HttpGet("GetAllRunningAccounts")]
-		public async Task<BaseResponseModel> GetAllRunningAccounts()
+		public async Task<ActionResult> GetAllRunningAccounts()
 		{
 			List<accountData> data = new List<accountData>();
 			foreach (var item in AccountManager.AllRunningAccounts)
@@ -48,7 +48,7 @@ namespace RBXUptimeBot.Controllers
 					isRunning = true
 				});
 			}
-			return new OkResponseModel(data: new
+			return Ok(new
 			{
 				TotalRunningAccounts = AccountManager.AllRunningAccounts.Count,
 				AllRunningAccounts = data

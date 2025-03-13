@@ -15,13 +15,13 @@ using Microsoft.Win32;
 using System.Net.NetworkInformation;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
-using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using System.Configuration;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace RBXUptimeBot.Classes
 {
@@ -60,7 +60,7 @@ namespace RBXUptimeBot.Classes
 
 		public static int maxAcc;
 
-		public static IMongoDbService<LogEntry> LogService;
+		public static PostgreService postgreService;
 
 		public static bool isDevelopment = false;
 
@@ -73,7 +73,7 @@ namespace RBXUptimeBot.Classes
 
 		private static Mutex rbxMultiMutex;
 
-		public static void AccManagerLoad()
+		public static void AccManagerLoad(string connstr)
 		{
 			AccountsList = new List<Account>();
 			AllRunningAccounts = new List<ActiveItem>();
@@ -90,6 +90,10 @@ namespace RBXUptimeBot.Classes
 			UsersClient = new RestClient("https://users.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
 			AuthClient = new RestClient("https://auth.roblox.com/");
+			
+			var optionsBuilder = new DbContextOptionsBuilder<PostgreService>();
+			optionsBuilder.UseNpgsql(connstr); // Replace with your actual connection string
+			postgreService = new PostgreService(optionsBuilder.Options);
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
@@ -104,28 +108,6 @@ namespace RBXUptimeBot.Classes
 			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
 			if (!General.Exists("Proxifier-Path")) General.Set("Proxifier-Path", "C:\\Program Files (x86)\\Proxifier\\Proxifier.exe");
 			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
-
-			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
-			try
-			{
-				var configuration = new ConfigurationBuilder()
-					.SetBasePath(Directory.GetCurrentDirectory())
-					.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-					.Build();
-				var mongoSettings = new MongoDBSettings();
-				configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
-				var options = Options.Create(mongoSettings);
-				LogService = new MongoDbService<LogEntry>(options);
-
-				if (LogService.IsConnected())
-				{
-					LogService.CreateAsync(Logger.Information($"App started. {DateTime.Now.ToString()}")).GetAwaiter().GetResult();
-				}
-			}
-			catch (Exception ex)
-			{
-				Logger.Critical($"Error creating MongoDbService: {ex}");
-			}
 
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 			if (!Prompts.Exists("VCPrompted") && (VCKey == null || (VCKey is RegistryKey && VCKey.GetValue("Bld") is int VCVersion && VCVersion < 32532)))
@@ -143,6 +125,7 @@ namespace RBXUptimeBot.Classes
 				});
 
 			UpdateMultiRoblox();
+			Task.Run(() => { ProxifierService.LoadProxyList(); });
 			IniSettings.Save("RAMSettings.ini");
 		}
 
@@ -172,7 +155,7 @@ namespace RBXUptimeBot.Classes
 		{
 			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId"))
 			{
-				LogService.CreateAsync(Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
+				Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.");
 				return false;
 			}
 
@@ -189,7 +172,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception ex)
 			{
-				LogService.CreateAsync(Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
+				Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex);
 				return false;
 			}
 			return true;
@@ -199,7 +182,7 @@ namespace RBXUptimeBot.Classes
 		{
 			if (!GSheet.Exists("AccountsTableName"))
 			{
-				LogService.CreateAsync(Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
+				Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.");
 				return;
 			}
 
@@ -212,7 +195,7 @@ namespace RBXUptimeBot.Classes
 				var values = response.Values;
 				if (values == null && values.Count <= 0)
 				{
-					LogService.CreateAsync(Logger.Information($"No account data found from google api.")).GetAwaiter().GetResult();
+					Logger.Information($"No account data found from google api.");
 					return;
 				}
 				maxAcc = values.Count - 1;
@@ -239,7 +222,7 @@ namespace RBXUptimeBot.Classes
 							if (account.Valid) AccountsList.Add(account);
 						}
 						catch (Exception ex) {
-							LogService.CreateAsync(Logger.Error($"Error while creating account.", ex)).GetAwaiter().GetResult();
+							Logger.Error($"Error while creating account.", ex);
 						}
 					}
 					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
@@ -247,7 +230,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception ex)
 			{
-				LogService.CreateAsync(Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
+				Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex);
 			}
 		}
 

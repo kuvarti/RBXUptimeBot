@@ -25,7 +25,7 @@ namespace RBXUptimeBot.Classes
 		{
 			if (!CheckINIparams())
 			{
-				await AccountManager.LogService.CreateAsync(Logger.Error("Google Sheet values cannot be updated.", new Exception(".INI file params is not setted")));
+				Logger.Error("Google Sheet values cannot be updated.", new Exception(".INI file params is not setted"));
 				return;
 			}
 			var batchUpdateRequest = new BatchUpdateValuesRequest
@@ -42,7 +42,7 @@ namespace RBXUptimeBot.Classes
 		{
 			if (!CheckINIparams())
 			{
-				await AccountManager.LogService.CreateAsync(Logger.Error("Google Sheet values cannot be updated.", new Exception(".INI file params is not setted")));
+				Logger.Error("Google Sheet values cannot be updated.", new Exception(".INI file params is not setted"));
 				return;
 			}
 			actualRange.Add(await RegisterLastUpdate());

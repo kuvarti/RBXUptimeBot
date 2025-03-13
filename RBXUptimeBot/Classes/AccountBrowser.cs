@@ -165,7 +165,7 @@ namespace RBXUptimeBot.Classes
 
 					Args.Add($"--proxy-server={ProxyString}");
 				}
-				else await AccountManager.LogService.CreateAsync(Logger.Error($"No Proxies found or logged in while account login. Process will be continue without proxy.", new Exception(proxyError)));
+				else Logger.Error($"No Proxies found or logged in while account login. Process will be continue without proxy.", new Exception(proxyError));
 			}
 
 			var Options = new LaunchOptions { Headless = false, DefaultViewport = null, Args = Args.ToArray(), IgnoreHTTPSErrors = true };
@@ -237,14 +237,14 @@ namespace RBXUptimeBot.Classes
 						else
 						{
 							result.Fail($"Account {Username} cannot be logged in.", "FAIL");
-							await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} cannot be logged in."));
+							Logger.Warning($"Account {Username} cannot be logged in.");
 						}
 						tcs.TrySetResult(true);
 					}
 				}
 				catch (Exception ex)
 				{
-					await AccountManager.LogService.CreateAsync(Logger.Error($"Exception in RequestFinished handler: {ex}", ex));
+					Logger.Error($"Exception in RequestFinished handler: {ex}", ex);
 					tcs.TrySetException(ex);
 				}
 			}
@@ -293,14 +293,14 @@ namespace RBXUptimeBot.Classes
 					if (active >= max)
 					{
 						result.Fail($"Account {Username} login attempt timeout. (5 min)", "FAIL");
-						await AccountManager.LogService.CreateAsync(Logger.Error($"Account {Username} login attempt timeout. (5 min)"));
+						Logger.Error($"Account {Username} login attempt timeout. (5 min)");
 						break;
 					}
 					;
 					if (page.Url == "https://www.roblox.com/login/securityNotification")
 					{
 						result.Fail($"Account {Username} needs email for login.", "FATAL");
-						await AccountManager.LogService.CreateAsync(Logger.Warning($"Account {Username} needs email for login."));
+						Logger.Warning($"Account {Username} needs email for login.");
 						break;
 					}
 					try {
@@ -321,7 +321,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception ex)
 			{
-				await AccountManager.LogService.CreateAsync(Logger.Error($"An exception was caught while trying to automatically log in: {ex.Message}", ex));
+				Logger.Error($"An exception was caught while trying to automatically log in: {ex.Message}", ex);
 			}
 			// here is the wait for Page_RequestFinished function to be waited
 			using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)))
@@ -332,7 +332,7 @@ namespace RBXUptimeBot.Classes
 				}
 				catch (OperationCanceledException a)
 				{
-					await AccountManager.LogService.CreateAsync(Logger.Error("Waiting for RequestFinished timed out.", a));
+					Logger.Error("Waiting for RequestFinished timed out.", a);
 				}
 				finally
 				{

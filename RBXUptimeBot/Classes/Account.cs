@@ -23,6 +23,7 @@ namespace RBXUptimeBot.Classes
 {
 	public partial class Account
 	{
+		
 		public bool Valid { get; set; }
 		private string _Ticket;
 		private int _isActive;
@@ -323,7 +324,7 @@ namespace RBXUptimeBot.Classes
 						}
 					}
 				}
-				catch (Exception x) { await AccountManager.LogService.CreateAsync(Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x)); }
+				catch (Exception x) { Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x); }
 			}
 
 			string LinkCode = string.IsNullOrEmpty(JobID) ? string.Empty : Regex.Match(JobID, "privateServerLinkCode=(.+)")?.Groups[1]?.Value;
@@ -386,11 +387,11 @@ namespace RBXUptimeBot.Classes
 						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
 
 					try { Launcher = Process.Start(LaunchInfo); }
-					catch (Exception e) { await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}")); }
+					catch (Exception e) { Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}"); }
 
 					if (Launcher == null || Launcher.HasExited)
 					{
-						await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})"));
+						Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})");
 						return;
 					}
 
@@ -450,7 +451,7 @@ namespace RBXUptimeBot.Classes
 		private async void LoginFailedProcedure(string text)
 		{
 			try { semaphore.Release(); } catch { }
-			await AccountManager.LogService.CreateAsync(Logger.Error(text));
+			Logger.Error(text);
 			PS.EndProcess();
 			IsActive = 0;
 		}
@@ -474,7 +475,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception e)
 			{
-				AccountManager.LogService.CreateAsync(Logger.Error($"Failed to kill process {process}", e));
+				Logger.Error($"Failed to kill process {process}", e);
 			}
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
