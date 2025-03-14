@@ -209,7 +209,7 @@ namespace RBXUptimeBot.Classes
 
 		public async Task<LoginResult> Login(string Username = "", string Password = "", string[] Arguments = null)
 		{
-			var ret = new LoginResult { Success = false, Message = "Unknown" };
+			var ret = new LoginResult { Success = false, ErrorType = "Unknown", Message = "Browser cannot connect to roblox." };
 			await LaunchBrowser("https://roblox.com/login", Arguments: Arguments, PostNavigation: async (page) => await LoginTask(page, ret, Username, Password));
 			return ret;
 		}

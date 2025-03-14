@@ -9,7 +9,8 @@ using System.Xml;
 namespace RBXUptimeBot.Classes.Services
 {
 	public class Proxy {
-		public string ProxyId { get; init; }
+		public int ProxyId { get; init; }
+		public string ProxyName { get; init; }
 		public string ProxyIP { get; init; }
 		public string ProxyPort { get; init; }
 		public string ProxyUsername { get; init; }
@@ -34,7 +35,7 @@ namespace RBXUptimeBot.Classes.Services
 		public Proxy Proxy { get => _Proxy; }
 		private static Process proxifierProcess;
 
-		public ProxifierService(string _proxyId) {
+		public ProxifierService(int _proxyId) {
 			_Proxy = Proxies.Find(p => p.ProxyId == _proxyId);
 			if (_Proxy == null)
 			{
@@ -45,7 +46,7 @@ namespace RBXUptimeBot.Classes.Services
 		private bool RefreshProxy()
 		{
 			if (!IsValid) {
-				string id = _Proxy.ProxyId;
+				int id = _Proxy.ProxyId;
 				_Proxy = Proxies.Find(p => p.ProxyId == id);
 				if (_Proxy == null)
 				{
@@ -199,15 +200,17 @@ namespace RBXUptimeBot.Classes.Services
 			while (true) {
 				try
 				{
-					var response = AccountManager.postgreService.ProxyTable.ToList();
+					var response = AccountManager.postgreService.ProxyTable?.ToList();
+					if (response == null) continue;
 					foreach (var item in response)
 					{
-						var exist = Proxies.Find(p => p.ProxyId == item.ProxyName);
+						var exist = Proxies.Find(p => p.ProxyId == item.ID);
 						Proxy tmp = new Proxy()
 						{
-							ProxyId = item.ProxyName,
+							ProxyId = item.ID,
 							ProxyIP = item.ProxyIP,
 							ProxyPort = item.ProxyPort,
+							ProxyName = item.ProxyName,
 							ProxyUsername = item.ProxyUser,
 							ProxyPassword = item.ProxyPassword
 						};

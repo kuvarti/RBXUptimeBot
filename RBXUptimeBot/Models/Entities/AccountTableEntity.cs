@@ -29,10 +29,13 @@ namespace RBXUptimeBot.Models.Entities
 		public DateTime? TokenCreatedTime { get; set; }
 
 		[Column("State")]
-		public string? State { get; set; }
+		public string? State { get; set; } = string.Empty;
 
 		[Column("Status")]
-		public string? Status { get; set; }
+		public string? Status { get; set; } = string.Empty;
+
+		[Column("LastUpdate")]
+		public DateTime? LastUpdate { get; set; }
 
 		// Foreign key sütunu: ProxyTable tablosuna referans verir.
 		[Required]

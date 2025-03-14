@@ -22,6 +22,8 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4.Data;
 using Microsoft.EntityFrameworkCore;
+using WebSocketSharp;
+using RBXUptimeBot.Models.Entities;
 
 namespace RBXUptimeBot.Classes
 {
@@ -34,7 +36,7 @@ namespace RBXUptimeBot.Classes
 
 	public class ActiveJob
 	{
-		public long Jid { get; set; }
+		public JobTableEntity JobEntity { get; set; }
 		public bool isRunning { get; set; }
 		public int AccountCount { get; set; }
 		public string DBid { get; set; }
@@ -69,7 +71,6 @@ namespace RBXUptimeBot.Classes
 		public static IniSection Machine;
 		public static IniSection Watcher;
 		public static IniSection Prompts;
-		public static IniSection GSheet;
 
 		private static Mutex rbxMultiMutex;
 
@@ -84,7 +85,6 @@ namespace RBXUptimeBot.Classes
 			Machine = IniSettings.Section("Machine");
 			Watcher = IniSettings.Section("Watcher");
 			Prompts = IniSettings.Section("Prompts");
-			GSheet = IniSettings.Section("GSheet");
 
 			MainClient = new RestClient("https://www.roblox.com/");
 			UsersClient = new RestClient("https://users.roblox.com");
@@ -141,82 +141,43 @@ namespace RBXUptimeBot.Classes
 
 		public static (bool, string) InitAccounts()
 		{
-			if (InitGoogleSheets())
+			if (postgreService.Database.CanConnect())
 			{
 				ProxifierService.EndProxifiers();
 				Task.Run(() => { ProxifierService.LoadProxyList(); });
 				LoadAccounts();
 			}
-			else return (false, "Program cannot make connection with Spreadsheet.");
+			else return (false, "Program cannot make connection with POstgresql.");
 			return (true, "Account are loading.");
-		}
-
-		private static bool InitGoogleSheets()
-		{
-			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId"))
-			{
-				Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.");
-				return false;
-			}
-
-			try
-			{
-				string[] Scopes = { SheetsService.Scope.Spreadsheets };
-				using var stream = new FileStream(GSheet.Get<string>("APIKeyFile"), FileMode.Open, FileAccess.Read);
-				var credential = GoogleCredential.FromStream(stream).CreateScoped(Scopes);
-				SheetsService = new SheetsService(new BaseClientService.Initializer()
-				{
-					HttpClientInitializer = credential,
-				});
-				SheetsService.Spreadsheets.Get(GSheet.Get<string>("SpreadsheetId")).Execute();
-			}
-			catch (Exception ex)
-			{
-				Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex);
-				return false;
-			}
-			return true;
 		}
 
 		private async static void LoadAccounts()
 		{
-			if (!GSheet.Exists("AccountsTableName"))
-			{
-				Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.");
-				return;
-			}
-
 			try
 			{
-				string SpreadsheetId = GSheet.Get<string>("SpreadsheetId");
-				string AccountsTableName = GSheet.Get<string>("AccountsTableName");
-				var response = SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute();
+				var response = postgreService.AccountTable?.ToList();
 
-				var values = response.Values;
-				if (values == null && values.Count <= 0)
+				if (response == null || response.Count <= 0)
 				{
-					Logger.Information($"No account data found from google api.");
+					Logger.Information($"No account data found from postgre.");
 					return;
 				}
-				maxAcc = values.Count - 1;
-				for (int i = 1; i < values.Count; i++)
+				maxAcc = response.Count;
+				foreach (var item in response)
 				{
-					var item = values[i];
-					if (//item[5].ToString() != "Standby" || //!(item[5].ToString() != $"Logged in on {Machine.Get<string>("Name")}") ||
-						item[7].ToString().StartsWith("FATAL:"))
+					if (!item.Status.IsNullOrEmpty() && item.Status.StartsWith("FATAL:"))
 						continue;
-					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
+					Account account = AccountsList.Find(acc => acc.ID == item.ID);
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
 					else
 					{
 						try
 						{
-							account = new Account(item[8].ToString())
+							account = new Account(item)
 							{
-								Row = Convert.ToInt16(item[0]),
-								Username = item[1]?.ToString(),
-								Password = item[2]?.ToString(),
-								SecurityToken = item[4]?.ToString()
+								Username = item.Username,
+								Password = item.Password,
+								SecurityToken = item.Token
 							};
 							await account.CheckTokenAndLoginIsNotValid();
 							if (account.Valid) AccountsList.Add(account);
@@ -230,7 +191,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception ex)
 			{
-				Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex);
+				Logger.Error($"Error while read data from postgre. Accounts will not be loaded.", ex);
 			}
 		}
 

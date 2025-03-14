@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
+using RBXUptimeBot.Models.Entities;
 using RestSharp;
 using System;
 using System.Collections.Generic;
@@ -23,7 +24,7 @@ namespace RBXUptimeBot.Classes
 {
 	public partial class Account
 	{
-		
+		public int ID { get; init; }
 		public bool Valid { get; set; }
 		private string _Ticket;
 		private int _isActive;
@@ -38,7 +39,7 @@ namespace RBXUptimeBot.Classes
 				else if (value == 1) State = "Join Queue";
 				else if (value > 10) State = "In Job";
 				else State = "Unknown";
-				if (Valid) _ = UpdateStatus(State);
+				if (Valid) UpdateStatus(State);
 			}
 		}
 		public int Row { get; init; }
@@ -51,18 +52,16 @@ namespace RBXUptimeBot.Classes
 			set
 			{
 				_Token = value;
-				if (Valid) _ = UpdateToken(value);
-				if (value.IsNullOrEmpty()) _ = UpdateStatus(string.Empty);
+				if (Valid) UpdateToken(value);
+				if (value.IsNullOrEmpty()) UpdateStatus(string.Empty);
 			}
 		}
-
+		private AccountTableEntity Entity;
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
 		private static readonly SemaphoreSlim instancecheck = new SemaphoreSlim(1, 1);
 		private ProxifierService PS;
-		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
 		public Dictionary<string, string> Fields = new Dictionary<string, string>();
-		public DateTime LastAttemptedRefresh;
 		[JsonIgnore] public DateTime TokenSet;
 		[JsonIgnore] public string CSRFToken;
 
@@ -72,12 +71,13 @@ namespace RBXUptimeBot.Classes
 		private RestClient AuthClient;
 		public string BrowserTrackerID;
 
-		public Account(string ProxyId)
+		public Account(AccountTableEntity _entity)
 		{
+			Entity = _entity;
 			Valid = false;
 			IsActive = 0;
 
-			PS = new ProxifierService(ProxyId);
+			PS = new ProxifierService(_entity.Proxy);
 			AuthClient = new RestClient(new RestClientOptions("https://auth.roblox.com/")
 			{
 				Proxy = new WebProxy($"http://{PS.Proxy.ProxyIP}:{PS.Proxy.ProxyPort}", false)
@@ -99,18 +99,18 @@ namespace RBXUptimeBot.Classes
 				{
 					Valid = true;
 					SecurityToken = loginRes.Message;
-					await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+					UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 				}
 				else
 				{
 					SecurityToken = "";
-					await UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
+					UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
 				}
 			}
 			else
 			{
 				Valid = true;
-				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+				UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
 			PS.EndProcess();
 			if (Valid) IsActive = 0;
@@ -482,10 +482,10 @@ namespace RBXUptimeBot.Classes
 
 		public void LogOutAcc()
 		{
-			UpdateCell(new List<ValueRange>{
-				CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
-				CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
-			}).GetAwaiter().GetResult();
+			//UpdateCell(new List<ValueRange>{
+			//	CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
+			//	CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
+			//}).GetAwaiter().GetResult();
 		}
 
 		public async void AdjustWindowPosition()

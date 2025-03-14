@@ -19,7 +19,7 @@ namespace RBXUptimeBot.Classes
 		{
 			var logEntry = new LogTableEntity
 			{
-				Timestamp = DateTime.Now,
+				Timestamp = DateTime.UtcNow,
 				Level = Convert.ToInt16(level),
 				Message = message,
 				Exception = exception?.ToSerializable()
