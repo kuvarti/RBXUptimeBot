@@ -4,6 +4,7 @@ using RBXUptimeBot.Models;
 using RBXUptimeBot.Models.Entities;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RBXUptimeBot.Classes.Services
 {
@@ -16,17 +17,18 @@ namespace RBXUptimeBot.Classes.Services
 		{
 			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
 				return $"Not enough accounts to start the job.({AccountManager.AccountsList.Count})";
-			var job = AccountManager.postgreService.JobTable.Add(new JobTableEntity()
-			{
+			var jobEntity = new JobTableEntity() {
 				PlaceID = jId.ToString(),
 				AccountCount = accCount,
 				StartTime = DateTime.Now,
 				EndTime = null,
 				Description = null,
-			});
+			};
+			var job = AccountManager.postgreService.JobTable.Add(jobEntity); //test this
+			AccountManager.postgreService.SaveChanges();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
-				Jid = jId,
+				JobEntity = jobEntity,
 				AccountCount = accCount,
 				startTime = DateTime.Now,
 				endTime = end,
@@ -34,6 +36,7 @@ namespace RBXUptimeBot.Classes.Services
 				ProcessList = new List<ActiveItem>()
 			});
 			new Thread(async () => await JobController(jId)).Start();
+			AccountManager.postgreService.JobTable.Add(jobEntity);//todo fix if failed
 
 			Logger.Trace($"job {jId} started in {DateTime.Now}");
 			return $"Job {jId} started.";
@@ -41,7 +44,7 @@ namespace RBXUptimeBot.Classes.Services
 
 		public async Task JobFinisher(long jid)
 		{
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 			if (job == null)
 			{
 				Logger.Error($"JobFinisher-Job {jid} cannot found.");
@@ -52,21 +55,17 @@ namespace RBXUptimeBot.Classes.Services
 				item.Account.LeaveServer();
 				AccountManager.AllRunningAccounts.RemoveAll(x => x.PID == item.PID);
 			}
-			AccountManager.ActiveJobs.Remove(job);
 
-			AccountManager.postgreService.JobTable.Update(new JobTableEntity()
-			{
-				PlaceID = jid.ToString(),
-				AccountCount = job.AccountCount,
-				StartTime = job.startTime,
-				EndTime = DateTime.Now,
-			});
+			job.JobEntity.EndTime = DateTime.Now;
+			job.JobEntity.AccountCount = job.AccountCount;
+			AccountManager.postgreService.SaveChanges();
+			AccountManager.ActiveJobs.Remove(job);
 			Logger.Trace($"job {jid} is finished {DateTime.Now}");
 		}
 
 		public async Task JobController(long jid)
 		{
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 			List<Account> accounts = new List<Account>();
 			if (job == null) return;
 			job.isRunning = true;
@@ -107,7 +106,7 @@ namespace RBXUptimeBot.Classes.Services
 		public async Task AddProcess(long jid)
 		{
 			List<Account> items = new List<Account>();
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 
 			if (job == null) return;
 			foreach (var account in AccountManager.AccountsList.FindAll(a => a.IsActive == 0))

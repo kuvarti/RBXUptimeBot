@@ -21,7 +21,7 @@ namespace RBXUptimeBot.Controllers
 		[HttpPost("start/{text}:{count}")]
 		public async Task<ActionResult> Run(long text = 5315046213, int count = 2, [FromQuery] int endTime = 30)
 		{
-			var exist = AccountManager.ActiveJobs.Find(x => x.Jid == text);
+			var exist = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == text.ToString());
 
 			if (exist != null) {
 				exist.AccountCount = count;
@@ -47,7 +47,7 @@ namespace RBXUptimeBot.Controllers
 		[HttpPost("finish/{text}")]
 		public async Task<ActionResult> close(long text = 5315046213)
 		{
-			var job = AccountManager.ActiveJobs.Find(x => x.Jid == text);
+			var job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == text.ToString());
 			if (job == null)
 				return BadRequest("Job not found.");
 			else
@@ -59,7 +59,7 @@ namespace RBXUptimeBot.Controllers
 		public async Task<ActionResult> info([FromQuery] long text = 0)
 		{
 			if (text > 0) {
-				var job = AccountManager.ActiveJobs.Find(x => x.Jid == text);
+				var job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == text.ToString());
 				if (job == null)
 					return BadRequest("Job not found.");
 				return Ok(job);
