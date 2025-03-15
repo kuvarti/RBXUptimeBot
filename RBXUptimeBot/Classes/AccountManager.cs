@@ -268,7 +268,7 @@ namespace RBXUptimeBot.Classes
 					if (!string.IsNullOrEmpty(account.GetField("SavedPlaceId")) && long.TryParse(account.GetField("SavedPlaceId"), out long PID)) PlaceId = PID;
 					if (!string.IsNullOrEmpty(account.GetField("SavedJobId"))) JobId = account.GetField("SavedJobId");
 				}
-				if (!AccountManager.ActiveJobs.Find(job => job.Jid == PlaceID).isRunning)
+				if (!AccountManager.ActiveJobs.Find(job => job.JobEntity.PlaceID == PlaceID.ToString()).isRunning)
 					break;
 				new Thread(async () =>
 				{

@@ -20,12 +20,12 @@ namespace RBXUptimeBot.Classes.Services
 			var jobEntity = new JobTableEntity() {
 				PlaceID = jId.ToString(),
 				AccountCount = accCount,
-				StartTime = DateTime.Now,
+				StartTime = DateTime.UtcNow,
 				EndTime = null,
 				Description = null,
 			};
-			var job = AccountManager.postgreService.JobTable.Add(jobEntity); //test this
-			AccountManager.postgreService.SaveChanges();
+			var job = AccountManager.postgreService.JobTable?.AddAsync(jobEntity); //test this
+			await AccountManager.postgreService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
 				JobEntity = jobEntity,
@@ -36,7 +36,6 @@ namespace RBXUptimeBot.Classes.Services
 				ProcessList = new List<ActiveItem>()
 			});
 			new Thread(async () => await JobController(jId)).Start();
-			AccountManager.postgreService.JobTable.Add(jobEntity);//todo fix if failed
 
 			Logger.Trace($"job {jId} started in {DateTime.Now}");
 			return $"Job {jId} started.";
@@ -56,9 +55,9 @@ namespace RBXUptimeBot.Classes.Services
 				AccountManager.AllRunningAccounts.RemoveAll(x => x.PID == item.PID);
 			}
 
-			job.JobEntity.EndTime = DateTime.Now;
+			job.JobEntity.EndTime = DateTime.UtcNow;
 			job.JobEntity.AccountCount = job.AccountCount;
-			AccountManager.postgreService.SaveChanges();
+			AccountManager.postgreService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Remove(job);
 			Logger.Trace($"job {jid} is finished {DateTime.Now}");
 		}
@@ -91,11 +90,9 @@ namespace RBXUptimeBot.Classes.Services
 					job.ProcessList.RemoveAll(ritem => ritem.Account == account);
 				}
 				accounts.Clear();
-				await Task.Delay(5000);
 				if (job.AccountCount > job.ProcessList.Count)
-				{
 					await AddProcess(jid);
-				}
+				await Task.Delay(5000);
 				if (!job.isRunning)
 					break;
 			}

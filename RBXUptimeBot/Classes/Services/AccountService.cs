@@ -7,7 +7,7 @@ namespace RBXUptimeBot.Classes
 		private void UpdateEntity()
 		{
 			Entity.LastUpdate = DateTime.UtcNow;
-			try { AccountManager.postgreService.SaveChanges(); } catch { }
+			try { AccountManager.postgreService.SaveChangesAsync(); } catch { }
 		}
 
 		private void UpdateToken(string token)

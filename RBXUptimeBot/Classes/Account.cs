@@ -367,7 +367,7 @@ namespace RBXUptimeBot.Classes
 			{
 				await semaphore.WaitAsync();
 				Process Launcher = null;
-				var job = AccountManager.ActiveJobs.Find(item => item.Jid == PlaceID);
+				var job = AccountManager.ActiveJobs.Find(item => item.JobEntity.PlaceID == PlaceID.ToString());
 				if (job == null)
 				{
 					LoginFailedProcedure($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");

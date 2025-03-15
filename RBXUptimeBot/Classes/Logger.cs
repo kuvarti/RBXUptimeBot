@@ -26,7 +26,7 @@ namespace RBXUptimeBot.Classes
 			};
 			_logEntries.Enqueue(logEntry);
 			AccountManager.postgreService.LogTable.Add(logEntry);
-			AccountManager.postgreService.SaveChanges();
+			AccountManager.postgreService.SaveChangesAsync();
 			return logEntry;
 		}
 
