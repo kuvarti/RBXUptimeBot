@@ -9,7 +9,8 @@ using System.Xml;
 namespace RBXUptimeBot.Classes.Services
 {
 	public class Proxy {
-		public string ProxyId { get; init; }
+		public int ProxyId { get; init; }
+		public string ProxyName { get; init; }
 		public string ProxyIP { get; init; }
 		public string ProxyPort { get; init; }
 		public string ProxyUsername { get; init; }
@@ -34,7 +35,7 @@ namespace RBXUptimeBot.Classes.Services
 		public Proxy Proxy { get => _Proxy; }
 		private static Process proxifierProcess;
 
-		public ProxifierService(string _proxyId) {
+		public ProxifierService(int _proxyId) {
 			_Proxy = Proxies.Find(p => p.ProxyId == _proxyId);
 			if (_Proxy == null)
 			{
@@ -45,7 +46,7 @@ namespace RBXUptimeBot.Classes.Services
 		private bool RefreshProxy()
 		{
 			if (!IsValid) {
-				string id = _Proxy.ProxyId;
+				int id = _Proxy.ProxyId;
 				_Proxy = Proxies.Find(p => p.ProxyId == id);
 				if (_Proxy == null)
 				{
@@ -116,7 +117,7 @@ namespace RBXUptimeBot.Classes.Services
 				}
 				catch (Exception ex)
 				{
-					AccountManager.LogService.CreateAsync(Logger.Error($"Error while waiting for proxifier to exit: {ex.Message}", ex));
+					Logger.Error($"Error while waiting for proxifier to exit: {ex.Message}", ex);
 					return;
 				}
 			}
@@ -127,7 +128,7 @@ namespace RBXUptimeBot.Classes.Services
 				// Bu kontrol, bekleme sırasında başka bir thread'in başlatıp başlatmadığını yakalar.
 				if (IsRunning || !RefreshProxy())
 				{
-					AccountManager.LogService.CreateAsync(Logger.Information("Proxifier is already running or proxy ID cannot found."));
+					Logger.Information("Proxifier is already running or proxy ID cannot found.");
 					return;
 				}
 
@@ -138,7 +139,7 @@ namespace RBXUptimeBot.Classes.Services
 				string proxifierPath = AccountManager.General.Get<string>("Proxifier-Path");
 				if (string.IsNullOrEmpty(proxifierPath) || !File.Exists(proxifierPath))
 				{
-					AccountManager.LogService.CreateAsync(Logger.Error("Proxifier path is invalid."));
+					Logger.Error("Proxifier path is invalid.");
 					return;
 				}
 
@@ -157,7 +158,7 @@ namespace RBXUptimeBot.Classes.Services
 				}
 				catch (Exception ex)
 				{
-					AccountManager.LogService.CreateAsync(Logger.Error($"Error while launching proxifier: {ex.Message}", ex));
+					Logger.Error($"Error while launching proxifier: {ex.Message}", ex);
 				}
 			}
 		}
@@ -178,7 +179,7 @@ namespace RBXUptimeBot.Classes.Services
 				}
 				catch (Exception ex)
 				{
-					AccountManager.LogService.CreateAsync(Logger.Error($"Error while ending proxifier process: {ex.Message}", ex));
+					Logger.Error($"Error while ending proxifier process: {ex.Message}", ex);
 				}
 			}
 		}
@@ -195,31 +196,27 @@ namespace RBXUptimeBot.Classes.Services
 		// Keep ProxyList Updated
 		public static async Task LoadProxyList()
 		{
-			if (!AccountManager.GSheet.Exists("ProxiesTableName") || !AccountManager.GSheet.Exists("SpreadsheetId"))
-			{
-				AccountManager.LogService.CreateAsync(Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
-				return ;
-			}
-			string SpreadsheetId = AccountManager.GSheet.Get<string>("SpreadsheetId");
-			string AccountsTableName = AccountManager.GSheet.Get<string>("ProxiesTableName");
 
 			while (true) {
 				try
 				{
-					var response = AccountManager.SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute().Values;
-					for (int i = 1; i < response.Count; i++)
+					var response = AccountManager.postgreService.ProxyTable?.ToList();
+					if (response == null) continue;
+					foreach (var item in response)
 					{
-						var item = response[i];
-						var exist = Proxies.Find(p => p.ProxyId == item[Columns["ID"]]);
-						Proxy tmp = new Proxy() { 
-							ProxyId = item[Columns["ID"]].ToString(),
-							ProxyIP = item[Columns["IP"]].ToString(),
-							ProxyPort = item[Columns["Port"]].ToString(),
-							ProxyUsername = item[Columns["Username"]].ToString(),
-							ProxyPassword = item[Columns["Password"]].ToString()
+						var exist = Proxies.Find(p => p.ProxyId == item.ID);
+						Proxy tmp = new Proxy()
+						{
+							ProxyId = item.ID,
+							ProxyIP = item.ProxyIP,
+							ProxyPort = item.ProxyPort,
+							ProxyName = item.ProxyName,
+							ProxyUsername = item.ProxyUser,
+							ProxyPassword = item.ProxyPassword
 						};
 						if (exist == null) Proxies.Add(tmp);
-						else if (exist != tmp){
+						else if (exist != tmp)
+						{
 							Proxies.Remove(exist);
 							Proxies.Add(tmp);
 						}

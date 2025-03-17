@@ -1,59 +1,49 @@
 ﻿using Microsoft.Extensions.Options;
 using PuppeteerExtraSharp;
 using RBXUptimeBot.Models;
+using RBXUptimeBot.Models.Entities;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RBXUptimeBot.Classes.Services
 {
 	public class JobService
 	{
-		public readonly IMongoDbService<JobEntry> _JobService;
-
 		public JobService()
-		{
-			var configuration = new ConfigurationBuilder()
-				.SetBasePath(Directory.GetCurrentDirectory())
-				.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-				.Build();
-			var mongoSettings = new MongoDBSettings();
-			configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
-			var options = Options.Create(mongoSettings);
-			_JobService = new MongoDbService<JobEntry>(options);
-		}
+		{ }
 
 		public async Task<string> JobStarter(long jId, int accCount, DateTime end)
 		{
 			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
 				return $"Not enough accounts to start the job.({AccountManager.AccountsList.Count})";
-			var job = new JobEntry()
-			{
-				placeId = jId.ToString(),
-				AccCount = accCount,
-				StartTime = DateTime.Now,
+			var jobEntity = new JobTableEntity() {
+				PlaceID = jId.ToString(),
+				AccountCount = accCount,
+				StartTime = DateTime.UtcNow,
 				EndTime = null,
 				Description = null,
 			};
-			_JobService.CreateAsync(job).GetAwaiter().GetResult();
+			var job = AccountManager.postgreService.JobTable?.AddAsync(jobEntity); //test this
+			await AccountManager.postgreService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
-				Jid = jId,
+				JobEntity = jobEntity,
 				AccountCount = accCount,
 				startTime = DateTime.Now,
 				endTime = end,
-				DBid = job.Id,
+				DBid = "0",
 				ProcessList = new List<ActiveItem>()
 			});
 			new Thread(async () => await JobController(jId)).Start();
 
-			if (AccountManager.LogService == null) Logger.Trace($"job {jId} started in {DateTime.Now}");
-			AccountManager.LogService?.CreateAsync(Logger.Trace($"job {jId} started in {DateTime.Now}"));
+			Logger.Trace($"job {jId} started in {DateTime.Now}");
 			return $"Job {jId} started.";
 		}
 
 		public async Task JobFinisher(long jid)
 		{
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 			if (job == null)
 			{
 				Logger.Error($"JobFinisher-Job {jid} cannot found.");
@@ -64,24 +54,17 @@ namespace RBXUptimeBot.Classes.Services
 				item.Account.LeaveServer();
 				AccountManager.AllRunningAccounts.RemoveAll(x => x.PID == item.PID);
 			}
+
+			job.JobEntity.EndTime = DateTime.UtcNow;
+			job.JobEntity.AccountCount = job.AccountCount;
+			AccountManager.postgreService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Remove(job);
-
-			_JobService.UpdateAsync(job.DBid, new JobEntry()
-			{
-				placeId = jid.ToString(),
-				AccCount = job.AccountCount,
-				StartTime = job.startTime,
-				EndTime = DateTime.Now,
-				Description = null
-			}).GetAwaiter().GetResult();
-			if (AccountManager.LogService == null) Logger.Trace($"job {jid} is finished {DateTime.Now}");
-			AccountManager.LogService?.CreateAsync(Logger.Information($"Job {jid} is finished {DateTime.Now}."));
-
+			Logger.Trace($"job {jid} is finished {DateTime.Now}");
 		}
 
 		public async Task JobController(long jid)
 		{
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 			List<Account> accounts = new List<Account>();
 			if (job == null) return;
 			job.isRunning = true;
@@ -93,12 +76,12 @@ namespace RBXUptimeBot.Classes.Services
 					{//todo investigate item.PID goes 
 						if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox")
 						{
-							AccountManager.LogService.CreateAsync(Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'"));
+							Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'");
 							accounts.Add(item.Account);
 						}
 					}
 					catch (Exception ex) {
-						AccountManager.LogService.CreateAsync(Logger.Critical($"Acccount {item.Account.Username} pid goes bblank unexpectedlyf"));
+						Logger.Critical($"Acccount {item.Account.Username} pid goes blank unexpectedly");
 					}
 				}
 				foreach (var account in accounts)
@@ -107,11 +90,9 @@ namespace RBXUptimeBot.Classes.Services
 					job.ProcessList.RemoveAll(ritem => ritem.Account == account);
 				}
 				accounts.Clear();
-				await Task.Delay(5000);
 				if (job.AccountCount > job.ProcessList.Count)
-				{
 					await AddProcess(jid);
-				}
+				await Task.Delay(5000);
 				if (!job.isRunning)
 					break;
 			}
@@ -122,7 +103,7 @@ namespace RBXUptimeBot.Classes.Services
 		public async Task AddProcess(long jid)
 		{
 			List<Account> items = new List<Account>();
-			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.Jid == jid);
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 
 			if (job == null) return;
 			foreach (var account in AccountManager.AccountsList.FindAll(a => a.IsActive == 0))

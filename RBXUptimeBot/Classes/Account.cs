@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
+using RBXUptimeBot.Models.Entities;
 using RestSharp;
 using System;
 using System.Collections.Generic;
@@ -23,6 +24,7 @@ namespace RBXUptimeBot.Classes
 {
 	public partial class Account
 	{
+		public int ID { get; init; }
 		public bool Valid { get; set; }
 		private string _Ticket;
 		private int _isActive;
@@ -37,7 +39,7 @@ namespace RBXUptimeBot.Classes
 				else if (value == 1) State = "Join Queue";
 				else if (value > 10) State = "In Job";
 				else State = "Unknown";
-				if (Valid) _ = UpdateStatus(State);
+				if (Valid) UpdateStatus(State);
 			}
 		}
 		public int Row { get; init; }
@@ -50,18 +52,16 @@ namespace RBXUptimeBot.Classes
 			set
 			{
 				_Token = value;
-				if (Valid) _ = UpdateToken(value);
-				if (value.IsNullOrEmpty()) _ = UpdateStatus(string.Empty);
+				if (Valid) UpdateToken(value);
+				if (value.IsNullOrEmpty()) UpdateStatus(string.Empty);
 			}
 		}
-
+		private AccountTableEntity Entity;
 		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
 		private static readonly SemaphoreSlim instancecheck = new SemaphoreSlim(1, 1);
 		private ProxifierService PS;
-		[JsonProperty(NullValueHandling = NullValueHandling.Ignore)] public string Group { get; set; } = "Default";
 		public long UserID;
 		public Dictionary<string, string> Fields = new Dictionary<string, string>();
-		public DateTime LastAttemptedRefresh;
 		[JsonIgnore] public DateTime TokenSet;
 		[JsonIgnore] public string CSRFToken;
 
@@ -71,12 +71,13 @@ namespace RBXUptimeBot.Classes
 		private RestClient AuthClient;
 		public string BrowserTrackerID;
 
-		public Account(string ProxyId)
+		public Account(AccountTableEntity _entity)
 		{
+			Entity = _entity;
 			Valid = false;
 			IsActive = 0;
 
-			PS = new ProxifierService(ProxyId);
+			PS = new ProxifierService(_entity.Proxy);
 			AuthClient = new RestClient(new RestClientOptions("https://auth.roblox.com/")
 			{
 				Proxy = new WebProxy($"http://{PS.Proxy.ProxyIP}:{PS.Proxy.ProxyPort}", false)
@@ -98,18 +99,18 @@ namespace RBXUptimeBot.Classes
 				{
 					Valid = true;
 					SecurityToken = loginRes.Message;
-					await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+					UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 				}
 				else
 				{
 					SecurityToken = "";
-					await UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
+					UpdateState($"{loginRes.ErrorType}: {loginRes.Message}");
 				}
 			}
 			else
 			{
 				Valid = true;
-				await UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+				UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
 			}
 			PS.EndProcess();
 			if (Valid) IsActive = 0;
@@ -323,7 +324,7 @@ namespace RBXUptimeBot.Classes
 						}
 					}
 				}
-				catch (Exception x) { await AccountManager.LogService.CreateAsync(Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x)); }
+				catch (Exception x) { Logger.Error($"An error occured attempting to close {Username}'s last process(es): {x}", x); }
 			}
 
 			string LinkCode = string.IsNullOrEmpty(JobID) ? string.Empty : Regex.Match(JobID, "privateServerLinkCode=(.+)")?.Groups[1]?.Value;
@@ -366,7 +367,7 @@ namespace RBXUptimeBot.Classes
 			{
 				await semaphore.WaitAsync();
 				Process Launcher = null;
-				var job = AccountManager.ActiveJobs.Find(item => item.Jid == PlaceID);
+				var job = AccountManager.ActiveJobs.Find(item => item.JobEntity.PlaceID == PlaceID.ToString());
 				if (job == null)
 				{
 					LoginFailedProcedure($"JobID({PlaceID}) cannot found while process start ({this.Username}). Process will be aborted");
@@ -386,11 +387,11 @@ namespace RBXUptimeBot.Classes
 						LaunchInfo.FileName = $"roblox-player:1+launchmode:play+gameinfo:{Ticket}+launchtime:{LaunchTime}+placelauncherurl:{HttpUtility.UrlEncode($"https://assetgame.roblox.com/game/PlaceLauncher.ashx?request=RequestGame{(string.IsNullOrEmpty(JobID) ? "" : "Job")}&browserTrackerId={BrowserTrackerID}&placeId={PlaceID}{(string.IsNullOrEmpty(JobID) ? "" : ("&gameId=" + JobID))}&isPlayTogetherGame=false")}+browsertrackerid:{BrowserTrackerID}+robloxLocale:en_us+gameLocale:en_us+channel:+LaunchExp:InApp";
 
 					try { Launcher = Process.Start(LaunchInfo); }
-					catch (Exception e) { await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}")); }
+					catch (Exception e) { Logger.Error($"JobID({PlaceID})({this.Username}) - {e.Message}"); }
 
 					if (Launcher == null || Launcher.HasExited)
 					{
-						await AccountManager.LogService.CreateAsync(Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})"));
+						Logger.Error($"JobID({PlaceID}) is failed to start in {DateTime.Now} ({this.Username})");
 						return;
 					}
 
@@ -450,7 +451,7 @@ namespace RBXUptimeBot.Classes
 		private async void LoginFailedProcedure(string text)
 		{
 			try { semaphore.Release(); } catch { }
-			await AccountManager.LogService.CreateAsync(Logger.Error(text));
+			Logger.Error(text);
 			PS.EndProcess();
 			IsActive = 0;
 		}
@@ -474,17 +475,17 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception e)
 			{
-				AccountManager.LogService.CreateAsync(Logger.Error($"Failed to kill process {process}", e));
+				Logger.Error($"Failed to kill process {process}", e);
 			}
 			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
 
 		public void LogOutAcc()
 		{
-			UpdateCell(new List<ValueRange>{
-				CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
-				CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
-			}).GetAwaiter().GetResult();
+			//UpdateCell(new List<ValueRange>{
+			//	CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
+			//	CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
+			//}).GetAwaiter().GetResult();
 		}
 
 		public async void AdjustWindowPosition()

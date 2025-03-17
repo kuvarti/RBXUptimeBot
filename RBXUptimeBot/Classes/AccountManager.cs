@@ -15,13 +15,15 @@ using Microsoft.Win32;
 using System.Net.NetworkInformation;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
-using MongoDB.Driver;
 using Microsoft.Extensions.Options;
 using System.Configuration;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Services;
 using Google.Apis.Sheets.v4.Data;
+using Microsoft.EntityFrameworkCore;
+using WebSocketSharp;
+using RBXUptimeBot.Models.Entities;
 
 namespace RBXUptimeBot.Classes
 {
@@ -34,7 +36,7 @@ namespace RBXUptimeBot.Classes
 
 	public class ActiveJob
 	{
-		public long Jid { get; set; }
+		public JobTableEntity JobEntity { get; set; }
 		public bool isRunning { get; set; }
 		public int AccountCount { get; set; }
 		public string DBid { get; set; }
@@ -60,7 +62,7 @@ namespace RBXUptimeBot.Classes
 
 		public static int maxAcc;
 
-		public static IMongoDbService<LogEntry> LogService;
+		public static PostgreService postgreService;
 
 		public static bool isDevelopment = false;
 
@@ -69,11 +71,10 @@ namespace RBXUptimeBot.Classes
 		public static IniSection Machine;
 		public static IniSection Watcher;
 		public static IniSection Prompts;
-		public static IniSection GSheet;
 
 		private static Mutex rbxMultiMutex;
 
-		public static void AccManagerLoad()
+		public static void AccManagerLoad(string connstr)
 		{
 			AccountsList = new List<Account>();
 			AllRunningAccounts = new List<ActiveItem>();
@@ -84,12 +85,15 @@ namespace RBXUptimeBot.Classes
 			Machine = IniSettings.Section("Machine");
 			Watcher = IniSettings.Section("Watcher");
 			Prompts = IniSettings.Section("Prompts");
-			GSheet = IniSettings.Section("GSheet");
 
 			MainClient = new RestClient("https://www.roblox.com/");
 			UsersClient = new RestClient("https://users.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
 			AuthClient = new RestClient("https://auth.roblox.com/");
+			
+			var optionsBuilder = new DbContextOptionsBuilder<PostgreService>();
+			optionsBuilder.UseNpgsql(connstr); // Replace with your actual connection string
+			postgreService = new PostgreService(optionsBuilder.Options);
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
@@ -104,28 +108,6 @@ namespace RBXUptimeBot.Classes
 			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
 			if (!General.Exists("Proxifier-Path")) General.Set("Proxifier-Path", "C:\\Program Files (x86)\\Proxifier\\Proxifier.exe");
 			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
-
-			// BU AMK UYGULAMASINI KESKE CLONELAYIP DUZENLEMEK YERINE 0'DAN YAPSAYDIM DA SOYLE UCUBE UCUBE SEYLER YAPMAK ZORUNDA KALMASAYDIM
-			try
-			{
-				var configuration = new ConfigurationBuilder()
-					.SetBasePath(Directory.GetCurrentDirectory())
-					.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-					.Build();
-				var mongoSettings = new MongoDBSettings();
-				configuration.GetSection("MongoDBSettings").Bind(mongoSettings);
-				var options = Options.Create(mongoSettings);
-				LogService = new MongoDbService<LogEntry>(options);
-
-				if (LogService.IsConnected())
-				{
-					LogService.CreateAsync(Logger.Information($"App started. {DateTime.Now.ToString()}")).GetAwaiter().GetResult();
-				}
-			}
-			catch (Exception ex)
-			{
-				Logger.Critical($"Error creating MongoDbService: {ex}");
-			}
 
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 			if (!Prompts.Exists("VCPrompted") && (VCKey == null || (VCKey is RegistryKey && VCKey.GetValue("Bld") is int VCVersion && VCVersion < 32532)))
@@ -143,6 +125,7 @@ namespace RBXUptimeBot.Classes
 				});
 
 			UpdateMultiRoblox();
+			Task.Run(() => { ProxifierService.LoadProxyList(); });
 			IniSettings.Save("RAMSettings.ini");
 		}
 
@@ -158,88 +141,49 @@ namespace RBXUptimeBot.Classes
 
 		public static (bool, string) InitAccounts()
 		{
-			if (InitGoogleSheets())
+			if (postgreService.Database.CanConnect())
 			{
 				ProxifierService.EndProxifiers();
 				Task.Run(() => { ProxifierService.LoadProxyList(); });
 				LoadAccounts();
 			}
-			else return (false, "Program cannot make connection with Spreadsheet.");
+			else return (false, "Program cannot make connection with POstgresql.");
 			return (true, "Account are loading.");
-		}
-
-		private static bool InitGoogleSheets()
-		{
-			if (!GSheet.Exists("APIKeyFile") || !GSheet.Exists("SpreadsheetId"))
-			{
-				LogService.CreateAsync(Logger.Error($"APIKeyFile or SpreadsheetId information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
-				return false;
-			}
-
-			try
-			{
-				string[] Scopes = { SheetsService.Scope.Spreadsheets };
-				using var stream = new FileStream(GSheet.Get<string>("APIKeyFile"), FileMode.Open, FileAccess.Read);
-				var credential = GoogleCredential.FromStream(stream).CreateScoped(Scopes);
-				SheetsService = new SheetsService(new BaseClientService.Initializer()
-				{
-					HttpClientInitializer = credential,
-				});
-				SheetsService.Spreadsheets.Get(GSheet.Get<string>("SpreadsheetId")).Execute();
-			}
-			catch (Exception ex)
-			{
-				LogService.CreateAsync(Logger.Error($"Error while connect google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
-				return false;
-			}
-			return true;
 		}
 
 		private async static void LoadAccounts()
 		{
-			if (!GSheet.Exists("AccountsTableName"))
-			{
-				LogService.CreateAsync(Logger.Error($"AccountsTableName information not exist. Accounts will not be loaded.")).GetAwaiter().GetResult();
-				return;
-			}
-
 			try
 			{
-				string SpreadsheetId = GSheet.Get<string>("SpreadsheetId");
-				string AccountsTableName = GSheet.Get<string>("AccountsTableName");
-				var response = SheetsService.Spreadsheets.Values.Get(SpreadsheetId, AccountsTableName).Execute();
+				var response = postgreService.AccountTable?.ToList();
 
-				var values = response.Values;
-				if (values == null && values.Count <= 0)
+				if (response == null || response.Count <= 0)
 				{
-					LogService.CreateAsync(Logger.Information($"No account data found from google api.")).GetAwaiter().GetResult();
+					Logger.Information($"No account data found from postgre.");
 					return;
 				}
-				maxAcc = values.Count - 1;
-				for (int i = 1; i < values.Count; i++)
+				maxAcc = response.Count;
+				foreach (var item in response)
 				{
-					var item = values[i];
-					if (//item[5].ToString() != "Standby" || //!(item[5].ToString() != $"Logged in on {Machine.Get<string>("Name")}") ||
-						item[7].ToString().StartsWith("FATAL:"))
+					if (!item.Status.IsNullOrEmpty() && item.Status.StartsWith("FATAL:"))
 						continue;
-					Account account = AccountsList.Find(acc => acc.Username == item[1].ToString());
+					Account account = AccountsList.Find(acc => acc.ID == item.ID);
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
 					else
 					{
 						try
 						{
-							account = new Account(item[8].ToString())
+							account = new Account(item)
 							{
-								Row = Convert.ToInt16(item[0]),
-								Username = item[1]?.ToString(),
-								Password = item[2]?.ToString(),
-								SecurityToken = item[4]?.ToString()
+								Username = item.Username,
+								Password = item.Password,
+								SecurityToken = item.Token
 							};
 							await account.CheckTokenAndLoginIsNotValid();
 							if (account.Valid) AccountsList.Add(account);
 						}
 						catch (Exception ex) {
-							LogService.CreateAsync(Logger.Error($"Error while creating account.", ex)).GetAwaiter().GetResult();
+							Logger.Error($"Error while creating account.", ex);
 						}
 					}
 					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
@@ -247,7 +191,7 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception ex)
 			{
-				LogService.CreateAsync(Logger.Error($"Error while read data from google api. Accounts will not be loaded.", ex)).GetAwaiter().GetResult();
+				Logger.Error($"Error while read data from postgre. Accounts will not be loaded.", ex);
 			}
 		}
 
@@ -324,7 +268,7 @@ namespace RBXUptimeBot.Classes
 					if (!string.IsNullOrEmpty(account.GetField("SavedPlaceId")) && long.TryParse(account.GetField("SavedPlaceId"), out long PID)) PlaceId = PID;
 					if (!string.IsNullOrEmpty(account.GetField("SavedJobId"))) JobId = account.GetField("SavedJobId");
 				}
-				if (!AccountManager.ActiveJobs.Find(job => job.Jid == PlaceID).isRunning)
+				if (!AccountManager.ActiveJobs.Find(job => job.JobEntity.PlaceID == PlaceID.ToString()).isRunning)
 					break;
 				new Thread(async () =>
 				{
