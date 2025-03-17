@@ -3,9 +3,10 @@ using RBXUptimeBot.Models;
 using RBXUptimeBot.Models.Entities;
 
 namespace RBXUptimeBot.Classes.Services
-{	public class PostgreService : DbContext
+{
+	public class PostgreService<T> : DbContext where T : Entity
 	{
-		public PostgreService(DbContextOptions<PostgreService> options)
+		public PostgreService(DbContextOptions<PostgreService<T>> options)
 			: base(options)
 		{
 		}
@@ -16,9 +17,6 @@ namespace RBXUptimeBot.Classes.Services
 			base.OnModelCreating(modelBuilder);
 		}
 
-		public DbSet<ProxyTableEntity> ProxyTable => Database.CanConnect() ? Set<ProxyTableEntity>() : null;
-		public DbSet<AccountTableEntity> AccountTable { get; set; }
-		public DbSet<JobTableEntity> JobTable { get; set; }
-		public DbSet<LogTableEntity> LogTable { get; set; }
+		public DbSet<T> Table { get; set; }
 	}
 }

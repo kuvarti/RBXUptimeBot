@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace RBXUptimeBot.Models.Entities
 {
 	[Table("ProxyTable", Schema = "public")]
-	public class ProxyTableEntity
+	public class ProxyTableEntity : Entity
 	{
 		[Key]
 		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]

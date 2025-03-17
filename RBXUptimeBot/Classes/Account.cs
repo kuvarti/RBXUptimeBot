@@ -482,10 +482,9 @@ namespace RBXUptimeBot.Classes
 
 		public void LogOutAcc()
 		{
-			//UpdateCell(new List<ValueRange>{
-			//	CreateAccountsTableRange($"{Columns["Status"]}{Row}", string.Empty).GetAwaiter().GetResult(),
-			//	CreateAccountsTableRange($"{Columns["State"]}{Row}", "Standby").GetAwaiter().GetResult()
-			//}).GetAwaiter().GetResult();
+			Entity.Status = string.Empty;
+			Entity.State = "Standby";
+			UpdateEntity();
 		}
 
 		public async void AdjustWindowPosition()

@@ -11,10 +11,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDbContext<PostgreService>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// 4. Hosted Service (Opsiyonel: Controller dışında servis kullanımı için)
-//builder.Services.AddHostedService<StartupHostedService>();
+//builder.Services.AddDbContext<PostgreService>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 

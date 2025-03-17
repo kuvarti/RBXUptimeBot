@@ -25,8 +25,8 @@ namespace RBXUptimeBot.Classes
 				Exception = exception?.ToSerializable()
 			};
 			_logEntries.Enqueue(logEntry);
-			AccountManager.postgreService.LogTable.Add(logEntry);
-			AccountManager.postgreService.SaveChangesAsync();
+			AccountManager.LogService.Table.Add(logEntry);
+			_ = AccountManager.LogService.SaveChangesAsync();
 			return logEntry;
 		}
 

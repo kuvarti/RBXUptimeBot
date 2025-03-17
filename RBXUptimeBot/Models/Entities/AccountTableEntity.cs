@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace RBXUptimeBot.Models.Entities
 {
 	[Table("AccountTable", Schema = "public")]
-	public class AccountTableEntity
+	public class AccountTableEntity : Entity
 	{
 		[Key]
 		[DatabaseGenerated(DatabaseGeneratedOption.Identity)]

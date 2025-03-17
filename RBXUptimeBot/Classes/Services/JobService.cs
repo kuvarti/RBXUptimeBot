@@ -24,8 +24,8 @@ namespace RBXUptimeBot.Classes.Services
 				EndTime = null,
 				Description = null,
 			};
-			var job = AccountManager.postgreService.JobTable?.AddAsync(jobEntity); //test this
-			await AccountManager.postgreService?.SaveChangesAsync();
+			var job = AccountManager.JobService.Table?.AddAsync(jobEntity); //test this
+			_ = AccountManager.JobService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
 				JobEntity = jobEntity,
@@ -57,7 +57,7 @@ namespace RBXUptimeBot.Classes.Services
 
 			job.JobEntity.EndTime = DateTime.UtcNow;
 			job.JobEntity.AccountCount = job.AccountCount;
-			AccountManager.postgreService?.SaveChangesAsync();
+			_ = AccountManager.JobService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Remove(job);
 			Logger.Trace($"job {jid} is finished {DateTime.Now}");
 		}

@@ -23,13 +23,6 @@ namespace RBXUptimeBot.Classes.Services
 		private static readonly string TempProxyFile = "ProxyFile.ppx";
 		private static List<Proxy> Proxies = new List<Proxy>();
 		private static readonly object lockObj = new object();
-		static readonly Dictionary<string, int> Columns = new Dictionary<string, int> {
-			{"ID", 1},
-			{"IP", 2},
-			{"Port", 3},
-			{"Username", 4},
-			{"Password", 5}
-		};
 
 		private Proxy _Proxy;
 		public Proxy Proxy { get => _Proxy; }
@@ -200,7 +193,7 @@ namespace RBXUptimeBot.Classes.Services
 			while (true) {
 				try
 				{
-					var response = AccountManager.postgreService.ProxyTable?.ToList();
+					var response = AccountManager.ProxyService.Table?.ToList();
 					if (response == null) continue;
 					foreach (var item in response)
 					{

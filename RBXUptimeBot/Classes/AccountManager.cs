@@ -62,7 +62,10 @@ namespace RBXUptimeBot.Classes
 
 		public static int maxAcc;
 
-		public static PostgreService postgreService;
+		public static PostgreService<LogTableEntity> LogService;
+		public static PostgreService<AccountTableEntity> AccountService;
+		public static PostgreService<JobTableEntity> JobService;
+		public static PostgreService<ProxyTableEntity> ProxyService;
 
 		public static bool isDevelopment = false;
 
@@ -91,9 +94,14 @@ namespace RBXUptimeBot.Classes
 			Web13Client = new RestClient("https://web.roblox.com/");
 			AuthClient = new RestClient("https://auth.roblox.com/");
 			
-			var optionsBuilder = new DbContextOptionsBuilder<PostgreService>();
+			var optionsBuilder = new DbContextOptionsBuilder<PostgreService<LogTableEntity>>();
 			optionsBuilder.UseNpgsql(connstr); // Replace with your actual connection string
-			postgreService = new PostgreService(optionsBuilder.Options);
+			LogService = new PostgreService<LogTableEntity>(optionsBuilder.Options);
+
+			//LogService = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(connstr).Options);
+			AccountService = new PostgreService<AccountTableEntity>(new DbContextOptionsBuilder<PostgreService<AccountTableEntity>>().UseNpgsql(connstr).Options);
+			JobService = new PostgreService<JobTableEntity>(new DbContextOptionsBuilder<PostgreService<JobTableEntity>>().UseNpgsql(connstr).Options);
+			ProxyService = new PostgreService<ProxyTableEntity>(new DbContextOptionsBuilder<PostgreService<ProxyTableEntity>>().UseNpgsql(connstr).Options);
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
@@ -127,9 +135,10 @@ namespace RBXUptimeBot.Classes
 			UpdateMultiRoblox();
 			Task.Run(() => { ProxifierService.LoadProxyList(); });
 			IniSettings.Save("RAMSettings.ini");
+			Logger.Information("Account Manager loaded.");
 		}
 
-		public static void ExitProtocol()
+		public static void ExitProtocol()//TODO make jobs finish
 		{
 			AccountsList.ForEach(ac =>
 			{
@@ -141,7 +150,7 @@ namespace RBXUptimeBot.Classes
 
 		public static (bool, string) InitAccounts()
 		{
-			if (postgreService.Database.CanConnect())
+			if (AccountService.Database.CanConnect())
 			{
 				ProxifierService.EndProxifiers();
 				Task.Run(() => { ProxifierService.LoadProxyList(); });
@@ -155,7 +164,7 @@ namespace RBXUptimeBot.Classes
 		{
 			try
 			{
-				var response = postgreService.AccountTable?.ToList();
+				var response = AccountService.Table?.ToList();
 
 				if (response == null || response.Count <= 0)
 				{
