@@ -74,6 +74,7 @@ namespace RBXUptimeBot.Classes
 		public static IniSection Machine;
 		public static IniSection Watcher;
 		public static IniSection Prompts;
+		public static Dictionary<string, IniSection> IniList;
 
 		private static Mutex rbxMultiMutex;
 
@@ -84,6 +85,7 @@ namespace RBXUptimeBot.Classes
 			ActiveJobs = new List<ActiveJob>();
 
 			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
+			IniList = new Dictionary<string, IniSection> { { "General", General }, { "Machine", Machine }, { "Watcher", Watcher }, { "Prompts", Prompts } };
 			General = IniSettings.Section("General");
 			Machine = IniSettings.Section("Machine");
 			Watcher = IniSettings.Section("Watcher");
@@ -93,12 +95,8 @@ namespace RBXUptimeBot.Classes
 			UsersClient = new RestClient("https://users.roblox.com");
 			Web13Client = new RestClient("https://web.roblox.com/");
 			AuthClient = new RestClient("https://auth.roblox.com/");
-			
-			var optionsBuilder = new DbContextOptionsBuilder<PostgreService<LogTableEntity>>();
-			optionsBuilder.UseNpgsql(connstr); // Replace with your actual connection string
-			LogService = new PostgreService<LogTableEntity>(optionsBuilder.Options);
 
-			//LogService = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(connstr).Options);
+			LogService = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(connstr).Options);
 			AccountService = new PostgreService<AccountTableEntity>(new DbContextOptionsBuilder<PostgreService<AccountTableEntity>>().UseNpgsql(connstr).Options);
 			JobService = new PostgreService<JobTableEntity>(new DbContextOptionsBuilder<PostgreService<JobTableEntity>>().UseNpgsql(connstr).Options);
 			ProxyService = new PostgreService<ProxyTableEntity>(new DbContextOptionsBuilder<PostgreService<ProxyTableEntity>>().UseNpgsql(connstr).Options);
