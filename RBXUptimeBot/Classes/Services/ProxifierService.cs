@@ -147,7 +147,7 @@ namespace RBXUptimeBot.Classes.Services
 				try
 				{
 					proxifierProcess = Process.Start(psi);
-					Task.Delay(TimeSpan.FromSeconds(1));
+					WaitInitialize();
 				}
 				catch (Exception ex)
 				{
@@ -174,6 +174,35 @@ namespace RBXUptimeBot.Classes.Services
 				{
 					Logger.Error($"Error while ending proxifier process: {ex.Message}", ex);
 				}
+			}
+		}
+
+		private void WaitInitialize()
+		{
+			while (true) {
+				if (GetCurrentIP() == Proxy.ProxyIP) return;
+				Task.Delay(TimeSpan.FromSeconds(1));
+			}
+		}
+
+		private static string GetCurrentIP()
+		{
+			var psi = new ProcessStartInfo
+			{
+				FileName = "cmd.exe",
+				Arguments = $"/c curl ifconfig.me",
+				RedirectStandardOutput = true,
+				RedirectStandardError = true,
+				UseShellExecute = false,
+				CreateNoWindow = true
+			};
+
+			using (var process = new Process { StartInfo = psi })
+			{
+				process.Start();
+				string output = process.StandardOutput.ReadToEnd();
+				process.WaitForExit();
+				return output;
 			}
 		}
 
