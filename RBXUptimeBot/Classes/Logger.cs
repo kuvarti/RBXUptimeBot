@@ -6,6 +6,7 @@ using System.Text.Json;
 using RBXUptimeBot.Models;
 using LogLevel = RBXUptimeBot.Models.LogLevel;
 using RBXUptimeBot.Models.Entities;
+using WebSocketSharp;
 
 namespace RBXUptimeBot.Classes
 {
@@ -17,16 +18,25 @@ namespace RBXUptimeBot.Classes
 		// Method to log a message with a specific level
 		public static LogTableEntity Log(LogLevel level, string message, Exception? exception = null)
 		{
+			JsonDocument exceptionMessage = null;
+
+			try {
+				if (exception != null) exceptionMessage = ExceptionHelper.ExceptionToJsonDocument(exception);
+			} catch (Exception e){
+				exceptionMessage = JsonDocument.Parse(JsonSerializer.Serialize($"{e.Message}. -- {exception.Message}"));
+			}
+
 			var logEntry = new LogTableEntity
 			{
 				Timestamp = DateTime.UtcNow,
 				Level = Convert.ToInt16(level),
 				Message = message,
-				Exception = exception?.ToSerializable()
+				Exception = exceptionMessage
 			};
 			_logEntries.Enqueue(logEntry);
 			AccountManager.LogService.Table.Add(logEntry);
 			_ = AccountManager.LogService.SaveChangesAsync();
+			
 			return logEntry;
 		}
 
@@ -51,22 +61,29 @@ namespace RBXUptimeBot.Classes
 		}
 	}
 
-	public static class ExceptionExtensions
+	public static class ExceptionHelper
 	{
-		public static SerializableException ToSerializable(this Exception ex)
+		public static JsonDocument ExceptionToJsonDocument(Exception ex)
 		{
-			if (ex == null) return null;
-
-			return new SerializableException
+			// Exception detaylarını anonim bir nesneye aktaralım.
+			var exceptionDetails = new
 			{
+				ExceptionType = ex.GetType().FullName,
 				Message = ex.Message,
 				StackTrace = ex.StackTrace,
-				Source = ex.Source,
-				TargetSite = ex.TargetSite?.ToString(),
-				ExceptionType = ex.GetType().FullName,
-				InnerException = ex.InnerException?.ToSerializable(),
-				Data = ex.Data != null && ex.Data.Count > 0 ? new Dictionary<string, object>() : null
+				InnerException = ex.InnerException != null ? new
+				{
+					ExceptionType = ex.InnerException.GetType().FullName,
+					Message = ex.InnerException.Message,
+					StackTrace = ex.InnerException.StackTrace
+				} : null
 			};
+
+			// Anonim nesneyi JSON string'e dönüştürelim.
+			string jsonString = JsonSerializer.Serialize(exceptionDetails);
+
+			// JSON string'i JsonDocument'e parse edelim.
+			return JsonDocument.Parse(jsonString);
 		}
 	}
 }

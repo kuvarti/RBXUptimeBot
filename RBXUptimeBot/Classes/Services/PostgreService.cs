@@ -13,7 +13,6 @@ namespace RBXUptimeBot.Classes.Services
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
-			modelBuilder.Ignore<SerializableException>();
 			base.OnModelCreating(modelBuilder);
 		}
 
