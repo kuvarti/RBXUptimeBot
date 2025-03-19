@@ -1,55 +1,46 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net8.0-windows7.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows7.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<PlatformTarget>x64</PlatformTarget>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Baseclass.Contrib.Nuget.Output" Version="2.4.4" />
-    <PackageReference Include="cef.redist.x64" Version="109.1.11" />
-    <PackageReference Include="cef.redist.x86" Version="109.1.11" />
-    <PackageReference Include="CefSharp.Common" Version="109.1.110" />
-    <PackageReference Include="CefSharp.WinForms" Version="109.1.110" />
-    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
-    <PackageReference Include="Google.Apis.Sheets.v4" Version="1.68.0.3658" />
-    <PackageReference Include="libsodium-net" Version="0.10.0" />
-    <PackageReference Include="log4net" Version="3.0.3" />
-    <PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="npgsql" Version="9.0.3" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
-    <PackageReference Include="PuppeteerExtraSharp" Version="2.0.0" />
-    <PackageReference Include="PuppeteerSharp" Version="10.0.0" />
-    <PackageReference Include="RestSharp" Version="110.2.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
-    <PackageReference Include="System.Management" Version="9.0.0" />
-    <PackageReference Include="System.Reactive.Windows.Forms" Version="6.0.1" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="4.5.0" />
-    <PackageReference Include="WebSocketSharp-netstandard" Version="1.0.1" />
-    <PackageReference Include="Yove.Proxy" Version="1.1.1" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Baseclass.Contrib.Nuget.Output" Version="2.4.4" />
+		<PackageReference Include="log4net" Version="3.0.3" />
+		<PackageReference Include="Microsoft.AspNetCore.WebUtilities" Version="2.2.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="npgsql" Version="9.0.3" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+		<PackageReference Include="PuppeteerExtraSharp" Version="2.0.0" />
+		<PackageReference Include="PuppeteerSharp" Version="10.0.0" />
+		<PackageReference Include="RestSharp" Version="110.2.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+		<PackageReference Include="System.Management" Version="9.0.0" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="4.5.0" />
+		<PackageReference Include="WebSocketSharp-netstandard" Version="1.0.1" />
+		<PackageReference Include="Yove.Proxy" Version="1.1.1" />
+	</ItemGroup>
+	<ItemGroup>
+		<Reference Include="Microsoft.Build.Utilities.v4.0">
+			<HintPath>libs\Microsoft.Build.Utilities.v4.0.dll</HintPath>
+			<Private>True</Private>
+		</Reference>
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Update="service_account.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
-  <ItemGroup>
-    <None Update="main.py">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="proxies.txt">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="Proxies\Template.ppx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+
+	<ItemGroup>
+		<None Update="main.py">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Proxies\Template.ppx">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>
