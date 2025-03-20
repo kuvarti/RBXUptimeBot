@@ -41,9 +41,5 @@ namespace RBXUptimeBot.Models.Entities
 		[Required]
 		[Column("Proxy")]
 		public int Proxy { get; set; }
-
-		// Navigation property (isteğe bağlı)
-		[ForeignKey("Proxy")]
-		public ProxyTableEntity? ProxyTable { get; set; }
 	}
 }

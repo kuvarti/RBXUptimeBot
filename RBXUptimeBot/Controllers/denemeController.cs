@@ -41,19 +41,38 @@ namespace RBXUptimeBot.Controllers
 		[HttpPost("ChangeSettingParameter/{Section}")]
 		public async Task<ActionResult> ChangeSettingParameter(string Section, [FromQuery] string parameter, [FromQuery] string value)
 		{
-			if (Section.IsNullOrEmpty()) BadRequest("Section is null or empty.");
-			if (parameter.IsNullOrEmpty()) BadRequest("Parameter is null or empty.");
+			if (Section.IsNullOrEmpty()) return BadRequest("Section is null or empty.");
+			if (parameter.IsNullOrEmpty()) return BadRequest("Parameter is null or empty.");
 
 			var _sec = AccountManager.IniList[Section];
-			if (_sec == null) BadRequest("Section not found.");
+			if (_sec == null) return BadRequest("Section not found.");
 			if (_sec.Exists(parameter))
 			{
 				if (value.IsNullOrEmpty()) _sec.RemoveProperty(parameter);
 				else _sec.Set(parameter, value);
 			}
-			else BadRequest("Parameter not found.");
+			else return BadRequest("Parameter not found.");
 			AccountManager.IniSettings.Save("RAMSettings.ini");
-			return Ok(_sec.Get(parameter));
+			return Ok($"[{Section}] {parameter}: {_sec.Get(parameter)}");
+		}
+
+		[HttpGet("GetAllCommands")]
+		public async Task<ActionResult> GetAllCommands()
+		{
+			var commands = new List<string>();
+			var a = Process.GetProcessesByName("RobloxPlayerBeta");
+			foreach (var item in a)
+			{
+				try
+				{
+					commands.Add(item.GetCommandLine());
+				}
+				catch (Exception ex)
+				{
+					commands.Add(ex.Message);
+				}
+			}
+			return Ok(commands);
 		}
 
 		[HttpPost("close")]

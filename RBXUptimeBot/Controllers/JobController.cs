@@ -31,8 +31,6 @@ namespace RBXUptimeBot.Controllers
 			}
 			if (AccountManager.AccountsList.Count < 1)
 				return BadRequest("There is no account logged in.");
-			else if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < count)
-				return BadRequest("There is not enought account to launch job.");
 			try
 			{
 				var msg = await _jobS.JobStarter(text, count, DateTime.Now.AddMinutes(endTime));
