@@ -17,10 +17,6 @@ using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
 using Microsoft.Extensions.Options;
 using System.Configuration;
-using Google.Apis.Sheets.v4;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Services;
-using Google.Apis.Sheets.v4.Data;
 using Microsoft.EntityFrameworkCore;
 using WebSocketSharp;
 using RBXUptimeBot.Models.Entities;
@@ -39,7 +35,6 @@ namespace RBXUptimeBot.Classes
 		public JobTableEntity JobEntity { get; set; }
 		public bool isRunning { get; set; }
 		public int AccountCount { get; set; }
-		public string DBid { get; set; }
 		public DateTime startTime { get; set; }
 		public DateTime endTime { get; set; }
 		public List<ActiveItem> ProcessList { get; set; }
@@ -49,7 +44,6 @@ namespace RBXUptimeBot.Classes
 	{
 		public static AccountManager Instance;
 		public static List<Account> AccountsList;
-		public static List<ActiveItem> AllRunningAccounts;
 		public static List<ActiveJob> ActiveJobs;
 		public static List<Game> RecentGames;
 		public static Account LastValidAccount; // this is used for the Batch class since getting place details requires authorization, auto updates whenever an account is used
@@ -58,7 +52,6 @@ namespace RBXUptimeBot.Classes
 		public static RestClient UsersClient;
 		public static RestClient Web13Client;
 		public static RestClient AuthClient;
-		public static SheetsService SheetsService;
 
 		public static int maxAcc;
 
@@ -81,15 +74,14 @@ namespace RBXUptimeBot.Classes
 		public static void AccManagerLoad(string connstr)
 		{
 			AccountsList = new List<Account>();
-			AllRunningAccounts = new List<ActiveItem>();
 			ActiveJobs = new List<ActiveJob>();
 
 			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
-			IniList = new Dictionary<string, IniSection> { { "General", General }, { "Machine", Machine }, { "Watcher", Watcher }, { "Prompts", Prompts } };
 			General = IniSettings.Section("General");
 			Machine = IniSettings.Section("Machine");
 			Watcher = IniSettings.Section("Watcher");
 			Prompts = IniSettings.Section("Prompts");
+			IniList = new Dictionary<string, IniSection> { { "General", General }, { "Machine", Machine }, { "Watcher", Watcher }, { "Prompts", Prompts } };
 
 			MainClient = new RestClient("https://www.roblox.com/");
 			UsersClient = new RestClient("https://users.roblox.com");
@@ -114,6 +106,7 @@ namespace RBXUptimeBot.Classes
 			if (!General.Exists("CaptchaTimeOut")) General.Set("CaptchaTimeOut", "300");
 			if (!General.Exists("Proxifier-Path")) General.Set("Proxifier-Path", "C:\\Program Files (x86)\\Proxifier\\Proxifier.exe");
 			if (!General.Exists("BloxstrapTimeout")) General.Set("BloxstrapTimeout", "30");
+			if (!General.Exists("ProxifierTimeout")) General.Set("ProxifierTimeout", "90");
 
 			var VCKey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\X86");
 			if (!Prompts.Exists("VCPrompted") && (VCKey == null || (VCKey is RegistryKey && VCKey.GetValue("Bld") is int VCVersion && VCVersion < 32532)))
@@ -136,13 +129,19 @@ namespace RBXUptimeBot.Classes
 			Logger.Information("Account Manager loaded.");
 		}
 
-		public static void ExitProtocol()//TODO make jobs finish
+		public static void ExitProtocol()
 		{
-			AccountsList.ForEach(ac =>
+			ActiveJobs.ForEach(job =>
 			{
-				ac.LeaveServer();
-				ac.LogOutAcc();
+				job.isRunning = false;
+				job.endTime = DateTime.Now;
+				
 			});
+			while (true) {
+				if (ActiveJobs.Count == 0) break;
+				Task.Delay(TimeSpan.FromSeconds(1));
+			}
+			AccountsList.ForEach(acc => acc.LogOutAcc());
 			System.Environment.Exit(0);
 		}
 
@@ -162,7 +161,7 @@ namespace RBXUptimeBot.Classes
 		{
 			try
 			{
-				var response = AccountService.Table?.ToList();
+				var response = AccountService.Table?.ToList().OrderBy(x => x.ID).ToList();
 
 				if (response == null || response.Count <= 0)
 				{
@@ -170,9 +169,10 @@ namespace RBXUptimeBot.Classes
 					return;
 				}
 				maxAcc = response.Count;
+				
 				foreach (var item in response)
 				{
-					if (!item.Status.IsNullOrEmpty() && item.Status.StartsWith("FATAL:"))
+					if ((!item.State.IsNullOrEmpty() && item.State.StartsWith("FATAL:")) || item.Proxy == 10) //todo fix here
 						continue;
 					Account account = AccountsList.Find(acc => acc.ID == item.ID);
 					if (account != null) await account.CheckTokenAndLoginIsNotValid();
@@ -284,6 +284,7 @@ namespace RBXUptimeBot.Classes
 						account.IsActive = 0;
 				}).Start();
 				await Task.Delay(TimeSpan.FromSeconds(General.Get<int>("JoinDelay")));
+				//await RBXUptimeBot.Classes.Services.JobService.ControlJobs(PlaceID);
 			}
 			Token.Cancel();
 			Token.Dispose();

@@ -36,25 +36,6 @@ namespace RBXUptimeBot.Controllers
 			return Ok(new { Accounts.Count, Accounts });
 		}
 
-		[HttpGet("GetAllRunningAccounts")]
-		public async Task<ActionResult> GetAllRunningAccounts()
-		{
-			List<accountData> data = new List<accountData>();
-			foreach (var item in AccountManager.AllRunningAccounts)
-			{
-				data.Add(new accountData()
-				{
-					name = item.Account.Username,
-					isRunning = true
-				});
-			}
-			return Ok(new
-			{
-				TotalRunningAccounts = AccountManager.AllRunningAccounts.Count,
-				AllRunningAccounts = data
-			});
-		}
-
 		[HttpPost("StartAccountsLogin")]
 		public async Task<ActionResult> StartAccountsLogin()
 		{

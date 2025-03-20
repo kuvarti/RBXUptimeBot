@@ -1,6 +1,4 @@
-﻿using CefSharp;
-using CefSharp.WinForms;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using PuppeteerExtraSharp;
 using PuppeteerExtraSharp.Plugins.ExtraStealth;
 using PuppeteerSharp;
@@ -12,17 +10,14 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Numerics;
-using System.Windows.Forms;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using WebSocketSharp;
 using Yove.Proxy;
-using System.Drawing;
 using PuppeteerSharp.Helpers;
 using Microsoft.AspNetCore.Http.HttpResults;
 using RBXUptimeBot.Classes.Services;
 using System.Reflection.Metadata;
-using System.Reactive.Disposables;
 
 namespace RBXUptimeBot.Classes
 {
