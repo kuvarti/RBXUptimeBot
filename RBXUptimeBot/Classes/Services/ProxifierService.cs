@@ -1,9 +1,6 @@
-﻿using Google.Apis.Auth.OAuth2;
-using Google.Apis.Services;
-using Google.Apis.Sheets.v4;
-using Google.Apis.Sheets.v4.Data;
-using System;
+﻿using System;
 using System.Diagnostics;
+using System.Net;
 using System.Xml;
 
 namespace RBXUptimeBot.Classes.Services
@@ -18,11 +15,9 @@ namespace RBXUptimeBot.Classes.Services
 	}
 	public class ProxifierService
 	{
-		// Senkronizasyon için lock nesnesi
 		private static readonly string ProxyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Proxies");
 		private static readonly string TempProxyFile = "ProxyFile.ppx";
 		private static List<Proxy> Proxies = new List<Proxy>();
-		private static readonly object lockObj = new object();
 
 		private Proxy _Proxy;
 		public Proxy Proxy { get => _Proxy; }
@@ -52,6 +47,7 @@ namespace RBXUptimeBot.Classes.Services
 
 		// Proxifier'ın çalışıp çalışmadığını kontrol eden property.
 		public bool IsValid => _Proxy != null && _Proxy.ProxyIP != null;
+		private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(1, 1);
 		public bool IsRunning => proxifierProcess != null && !proxifierProcess.HasExited;
 
 		// Proxy Profile File Operations
@@ -88,11 +84,13 @@ namespace RBXUptimeBot.Classes.Services
 			return false;
 		}
 
-		public void LaunchProcess()
+		public async Task LaunchProcess()
 		{
 			Process processToWait = null;
-			// İlk olarak, lock içerisinde kontrol ediyoruz.
-			lock (lockObj)
+
+			// İlk olarak, semaphore içerisinde kontrol ediyoruz.
+			await semaphore.WaitAsync();
+			try
 			{
 				if (IsRunning)
 				{
@@ -100,8 +98,12 @@ namespace RBXUptimeBot.Classes.Services
 					processToWait = proxifierProcess;
 				}
 			}
+			finally
+			{
+				semaphore.Release();
+			}
 
-			// Eğer proxifier çalışıyorsa, lock dışında bekleyerek mevcut process'in bitmesini sağlıyoruz.
+			// Eğer proxifier çalışıyorsa, semaphore dışında bekleyerek mevcut process'in bitmesini sağlıyoruz.
 			if (processToWait != null)
 			{
 				try
@@ -115,8 +117,9 @@ namespace RBXUptimeBot.Classes.Services
 				}
 			}
 
-			// Tekrar lock alarak, yeni proxifier başlatma işlemini gerçekleştiriyoruz.
-			lock (lockObj)
+			// Tekrar semaphore alarak, yeni proxifier başlatma işlemini gerçekleştiriyoruz.
+			await semaphore.WaitAsync();
+			try
 			{
 				// Bu kontrol, bekleme sırasında başka bir thread'in başlatıp başlatmadığını yakalar.
 				if (IsRunning || !RefreshProxy())
@@ -147,63 +150,56 @@ namespace RBXUptimeBot.Classes.Services
 				try
 				{
 					proxifierProcess = Process.Start(psi);
-					WaitInitialize();
 				}
 				catch (Exception ex)
 				{
 					Logger.Error($"Error while launching proxifier: {ex.Message}", ex);
 				}
 			}
+			finally
+			{
+				semaphore.Release();
+			}
 		}
 
 		// Proxifier'ı sonlandırma
-		public void EndProcess()
+		// Proxifier'ı sonlandırma
+		public async Task EndProcess()
 		{
-			lock (lockObj)
+			await semaphore.WaitAsync();
+			try
 			{
-				try
+				if (proxifierProcess != null && !proxifierProcess.HasExited)
 				{
-					if (proxifierProcess != null && !proxifierProcess.HasExited)
-					{
-						proxifierProcess.Kill();
-						proxifierProcess = null;
-						DeleteProxyProfile();
-					}
+					proxifierProcess.Kill();
+					proxifierProcess = null;
+					DeleteProxyProfile();
 				}
-				catch (Exception ex)
-				{
-					Logger.Error($"Error while ending proxifier process: {ex.Message}", ex);
-				}
+			}
+			catch (Exception ex)
+			{
+				Logger.Error($"Error while ending proxifier process: {ex.Message}", ex);
+			}
+			finally
+			{
+				semaphore.Release();
 			}
 		}
 
-		private void WaitInitialize()
+		public async Task WaitInitialize()
 		{
-			while (true) {
-				if (GetCurrentIP() == Proxy.ProxyIP) return;
-				Task.Delay(TimeSpan.FromSeconds(1));
+			int i = 0, max = AccountManager.General.Get<int>("ProxifierTimeout");
+			while (++i <= max) {
+				HttpClient _httpClient = new HttpClient();
+				if (await _httpClient.GetStringAsync("https://ifconfig.me/ip") == Proxy.ProxyIP){
+					_httpClient.Dispose();
+					return;
+				}
+				_httpClient.Dispose();
+				await Task.Delay(TimeSpan.FromSeconds(3));
 			}
-		}
-
-		private static string GetCurrentIP()
-		{
-			var psi = new ProcessStartInfo
-			{
-				FileName = "cmd.exe",
-				Arguments = $"/c curl ifconfig.me",
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
-				UseShellExecute = false,
-				CreateNoWindow = true
-			};
-
-			using (var process = new Process { StartInfo = psi })
-			{
-				process.Start();
-				string output = process.StandardOutput.ReadToEnd();
-				process.WaitForExit();
-				return output;
-			}
+			await EndProcess();
+			throw new Exception($"Proxifier initialization timeout.");
 		}
 
 		public static void EndProxifiers()
