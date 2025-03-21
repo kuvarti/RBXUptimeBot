@@ -15,8 +15,6 @@ namespace RBXUptimeBot.Classes.Services
 
 		public async Task<string> JobStarter(long jId, int accCount, DateTime end)
 		{
-			if (AccountManager.AccountsList.Count - AccountManager.AllRunningAccounts.Count < accCount)
-				return $"Not enough accounts to start the job.({AccountManager.AccountsList.Count})";
 			var jobEntity = new JobTableEntity() {
 				PlaceID = jId.ToString(),
 				AccountCount = accCount,
@@ -24,7 +22,7 @@ namespace RBXUptimeBot.Classes.Services
 				EndTime = null,
 				Description = null,
 			};
-			var job = AccountManager.JobService.Table?.AddAsync(jobEntity); //test this
+			var job = AccountManager.JobService.Table?.AddAsync(jobEntity);
 			_ = AccountManager.JobService?.SaveChangesAsync();
 			AccountManager.ActiveJobs.Add(new ActiveJob()
 			{
@@ -32,11 +30,9 @@ namespace RBXUptimeBot.Classes.Services
 				AccountCount = accCount,
 				startTime = DateTime.Now,
 				endTime = end,
-				DBid = "0",
 				ProcessList = new List<ActiveItem>()
 			});
 			new Thread(async () => await JobController(jId)).Start();
-
 			Logger.Trace($"job {jId} started in {DateTime.Now}");
 			return $"Job {jId} started.";
 		}
@@ -50,14 +46,12 @@ namespace RBXUptimeBot.Classes.Services
 				return;
 			}
 			foreach (var item in job.ProcessList)
-			{
 				item.Account.LeaveServer();
-				AccountManager.AllRunningAccounts.RemoveAll(x => x.PID == item.PID);
-			}
-
 			job.JobEntity.EndTime = DateTime.UtcNow;
 			job.JobEntity.AccountCount = job.AccountCount;
 			_ = AccountManager.JobService?.SaveChangesAsync();
+
+			job.ProcessList.Clear();
 			AccountManager.ActiveJobs.Remove(job);
 			Logger.Trace($"job {jid} is finished {DateTime.Now}");
 		}
@@ -70,33 +64,43 @@ namespace RBXUptimeBot.Classes.Services
 			job.isRunning = true;
 			while (DateTime.Now < job.endTime)
 			{
-				foreach (var item in job.ProcessList)
-				{
-					try
-					{//todo investigate item.PID goes 
-						if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox")
-						{
-							Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'");
-							accounts.Add(item.Account);
-						}
-					}
-					catch (Exception ex) {
-						Logger.Critical($"Acccount {item.Account.Username} pid goes blank unexpectedly");
-					}
-				}
-				foreach (var account in accounts)
-				{
-					account.LeaveServer();
-					job.ProcessList.RemoveAll(ritem => ritem.Account == account);
-				}
-				accounts.Clear();
+				await ControlJobs(jid);
 				if (job.AccountCount > job.ProcessList.Count)
 					await AddProcess(jid);
 				await Task.Delay(5000);
 				if (!job.isRunning)
 					break;
 			}
-			JobFinisher(jid);
+			await JobFinisher(jid);
+		}
+
+		public static async Task ControlJobs(long jid) {
+			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
+			if (job == null) return;
+
+			List<Account> accounts = new List<Account>();
+			foreach (var item in job.ProcessList)
+			{
+				try
+				{
+					if (Process.GetProcessById(item.PID).MainWindowTitle != "Roblox")
+					{
+						Logger.Error($"Something is wrong with client {item.Account.Username}: Main Window title isnt 'Roblox'");
+						accounts.Add(item.Account);
+					}
+				}
+				catch (Exception ex)
+				{
+					Logger.Critical($"Acccount {item.Account.Username} pid goes blank unexpectedly");
+					accounts.Add(item.Account);
+				}
+			}
+			foreach (var account in accounts)
+			{
+				account.LeaveServer();
+				job.ProcessList.RemoveAll(ritem => ritem.Account == account);
+			}
+			accounts.Clear();
 		}
 
 		// Assingning early bc; it can be used from another process while running

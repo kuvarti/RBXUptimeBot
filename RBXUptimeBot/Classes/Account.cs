@@ -1,5 +1,4 @@
-﻿using Google.Apis.Sheets.v4.Data;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RBXUptimeBot.Classes.Services;
 using RBXUptimeBot.Models;
@@ -89,7 +88,8 @@ namespace RBXUptimeBot.Classes
 
 		public async Task CheckTokenAndLoginIsNotValid()
 		{
-			PS.LaunchProcess(); await Wait4Proxyfier();
+			try { PS.LaunchProcess(); await PS.WaitInitialize(); }
+			catch (Exception e) { Logger.Error($"Something went wrong with using proxifier while account({Entity.Username}) login.", e); }
 			if (AccountManager.Machine.Get<bool>("ReLoginEveryTime") || (!GetCSRFToken(out string _, true) && !GetAuthTicket(out string _, true)))
 			{
 				AccountBrowser acbrowser = new AccountBrowser() { Size = new System.Numerics.Vector2(455, 485) };
@@ -100,6 +100,7 @@ namespace RBXUptimeBot.Classes
 					Valid = true;
 					SecurityToken = loginRes.Message;
 					UpdateState($"Logged in on {AccountManager.Machine.Get<string>("Name")}.");
+					UpdateStatus("Standby");
 				}
 				else
 				{
@@ -139,7 +140,6 @@ namespace RBXUptimeBot.Classes
 
 				return true;
 			}
-
 			return false;
 		}
 		//TODO these two can be combined into one method???
@@ -218,17 +218,6 @@ namespace RBXUptimeBot.Classes
 			return false;
 		}
 
-		private async Task Wait4Proxyfier()
-		{
-			Process p = null;
-			while (p == null)
-			{
-				var pl = Process.GetProcessesByName("Proxifier");
-				if (pl != null) p = pl.FirstOrDefault();
-				await Task.Delay(TimeSpan.FromSeconds(5));
-			}
-		}
-
 		public async Task InstanceCheck()
 		{
 			await instancecheck.WaitAsync();
@@ -281,8 +270,9 @@ namespace RBXUptimeBot.Classes
 
 		public async Task JoinServer(long PlaceID, string JobID = "", bool FollowUser = false, bool JoinVIP = false, bool Internal = false) // oh god i am not refactoring everything to be async im sorry
 		{
-			PS.LaunchProcess();
-			await Wait4Proxyfier();
+			try { PS.LaunchProcess(); await PS.WaitInitialize(); }
+			catch (Exception e) { Logger.Error($"Something went wrong with using proxifier while account({Entity.Username}) Join Server.", e); }
+
 			if (string.IsNullOrEmpty(BrowserTrackerID))
 			{
 				Random r = new Random();
@@ -424,20 +414,17 @@ namespace RBXUptimeBot.Classes
 						StartTime = DateTime.Now
 					};
 					job.ProcessList.AddOrChange(ret);
-					AccountManager.AllRunningAccounts.AddOrChange(ret);
 					Logger.Information($"JobID({PlaceID}) is successfuly started in {DateTime.Now} ({this.Username})");
 					await errorcheck;
 
-					try { semaphore.Release(); } catch { }
 					PS.EndProcess();
-					Launcher.WaitForExit();
+					try { semaphore.Release(); } catch { }
 				}
 				catch (Exception x)
 				{
 					PS.EndProcess();
 					if (Launcher != null)
 					{
-						AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == Launcher.Id);
 						job.ProcessList.RemoveAll(item => item.PID == Launcher.Id);
 						this.LeaveServer();
 					}
@@ -461,13 +448,14 @@ namespace RBXUptimeBot.Classes
 		public void LeaveServer(long jid = 0)
 		{
 			int process = this.IsActive;
-			//if (jid != 0)
-			//	AccountManager.ActiveJobs.Find(job => job.Jid == jid).ProcessList.RemoveAll(prcs => prcs.Account.IsActive == process);
 			try
 			{
 				this.IsActive = 0;
 				if (process != 0)
 				{
+					Entity.State = $"Logged in on {AccountManager.Machine.Get<string>("Name")}.";
+					Entity.Status = "Standby";
+					UpdateEntity();
 					var proc = Process.GetProcessById(process);
 					proc.CloseMainWindow();
 					proc.Kill();
@@ -475,9 +463,20 @@ namespace RBXUptimeBot.Classes
 			}
 			catch (Exception e)
 			{
+				var proxList = Process.GetProcessesByName("RobloxPlayerBeta");
+				foreach (var item in proxList)
+				{
+					if (CheckTicket(item.GetCommandLine(), _Ticket))
+					{
+						try {
+							item.CloseMainWindow();
+							item.Kill();
+						} catch { }
+						break;
+					}
+				}
 				Logger.Error($"Failed to kill process {process}", e);
 			}
-			AccountManager.AllRunningAccounts.RemoveAll(item => item.PID == process);
 		}
 
 		public void LogOutAcc()
@@ -485,6 +484,7 @@ namespace RBXUptimeBot.Classes
 			Entity.Status = string.Empty;
 			Entity.State = "Standby";
 			UpdateEntity();
+			AccountManager.AccountsList.Remove(this);
 		}
 
 		public async void AdjustWindowPosition()
