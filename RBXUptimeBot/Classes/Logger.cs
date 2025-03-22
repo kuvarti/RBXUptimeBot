@@ -7,6 +7,8 @@ using RBXUptimeBot.Models;
 using LogLevel = RBXUptimeBot.Models.LogLevel;
 using RBXUptimeBot.Models.Entities;
 using WebSocketSharp;
+using RBXUptimeBot.Classes.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace RBXUptimeBot.Classes
 {
@@ -16,7 +18,7 @@ namespace RBXUptimeBot.Classes
 		private static readonly ConcurrentQueue<LogTableEntity> _logEntries = new ConcurrentQueue<LogTableEntity>();
 
 		// Method to log a message with a specific level
-		public static LogTableEntity Log(LogLevel level, string message, Exception? exception = null)
+		public static LogTableEntity Log(LogLevel level, string message, Exception? exception = null, bool savePostgre = true)
 		{
 			JsonDocument exceptionMessage = null;
 
@@ -34,9 +36,13 @@ namespace RBXUptimeBot.Classes
 				Exception = exceptionMessage
 			};
 			_logEntries.Enqueue(logEntry);
-			AccountManager.LogService.Table.Add(logEntry);
-			_ = AccountManager.LogService.SaveChangesAsync();
-			
+			if (!savePostgre) return logEntry;
+
+			using (var postgre = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(AccountManager.ConnStr).Options))
+			{
+				postgre.Table?.Add(logEntry);
+				postgre.SaveChanges();
+			}
 			return logEntry;
 		}
 

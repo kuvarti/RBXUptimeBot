@@ -16,6 +16,15 @@ namespace RBXUptimeBot.Classes.Services
 			base.OnModelCreating(modelBuilder);
 		}
 
+		public override int SaveChanges() {
+			try {
+				return base.SaveChanges();
+			} catch (Exception ex){
+				Logger.Log(Models.LogLevel.Error, $"", ex, false);
+			}
+			return 0;
+		}
+
 		public DbSet<T> Table { get; set; }
 	}
 }

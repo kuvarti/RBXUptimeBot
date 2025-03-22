@@ -55,11 +55,7 @@ namespace RBXUptimeBot.Classes
 
 		public static int maxAcc;
 
-		public static PostgreService<LogTableEntity> LogService;
-		public static PostgreService<AccountTableEntity> AccountService;
 		public static PostgreService<JobTableEntity> JobService;
-		public static PostgreService<ProxyTableEntity> ProxyService;
-
 		public static bool isDevelopment = false;
 
 		public static IniFile IniSettings;
@@ -70,11 +66,13 @@ namespace RBXUptimeBot.Classes
 		public static Dictionary<string, IniSection> IniList;
 
 		private static Mutex rbxMultiMutex;
+		public static string ConnStr { get; set; } = string.Empty;
 
 		public static void AccManagerLoad(string connstr)
 		{
 			AccountsList = new List<Account>();
 			ActiveJobs = new List<ActiveJob>();
+			AccountManager.ConnStr = connstr;
 
 			IniSettings = File.Exists(Path.Combine(Environment.CurrentDirectory, "RAMSettings.ini")) ? new IniFile("RAMSettings.ini") : new IniFile();
 			General = IniSettings.Section("General");
@@ -88,10 +86,7 @@ namespace RBXUptimeBot.Classes
 			Web13Client = new RestClient("https://web.roblox.com/");
 			AuthClient = new RestClient("https://auth.roblox.com/");
 
-			LogService = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(connstr).Options);
-			AccountService = new PostgreService<AccountTableEntity>(new DbContextOptionsBuilder<PostgreService<AccountTableEntity>>().UseNpgsql(connstr).Options);
 			JobService = new PostgreService<JobTableEntity>(new DbContextOptionsBuilder<PostgreService<JobTableEntity>>().UseNpgsql(connstr).Options);
-			ProxyService = new PostgreService<ProxyTableEntity>(new DbContextOptionsBuilder<PostgreService<ProxyTableEntity>>().UseNpgsql(connstr).Options);
 
 			/* MACHINE */
 			if (!Machine.Exists("Name")) Machine.Set("Name", "RoBot-1");
@@ -135,9 +130,10 @@ namespace RBXUptimeBot.Classes
 			{
 				job.isRunning = false;
 				job.endTime = DateTime.Now;
-				
+
 			});
-			while (true) {
+			while (true)
+			{
 				if (ActiveJobs.Count == 0) break;
 				Task.Delay(TimeSpan.FromSeconds(1));
 			}
@@ -147,13 +143,13 @@ namespace RBXUptimeBot.Classes
 
 		public static (bool, string) InitAccounts()
 		{
-			if (AccountService.Database.CanConnect())
+			using (var postgre = new PostgreService<LogTableEntity>(new DbContextOptionsBuilder<PostgreService<LogTableEntity>>().UseNpgsql(ConnStr).Options))
 			{
+				if (!postgre.Database.CanConnect()) return (false, "Program cannot make connection with POstgresql.");
 				ProxifierService.EndProxifiers();
 				Task.Run(() => { ProxifierService.LoadProxyList(); });
 				LoadAccounts();
 			}
-			else return (false, "Program cannot make connection with POstgresql.");
 			return (true, "Account are loading.");
 		}
 
@@ -161,39 +157,42 @@ namespace RBXUptimeBot.Classes
 		{
 			try
 			{
-				var response = AccountService.Table?.ToList().OrderBy(x => x.ID).ToList();
-
-				if (response == null || response.Count <= 0)
+				using (var postgre = new PostgreService<AccountTableEntity>(new DbContextOptionsBuilder<PostgreService<AccountTableEntity>>().UseNpgsql(ConnStr).Options))
 				{
-					Logger.Information($"No account data found from postgre.");
-					return;
-				}
-				maxAcc = response.Count;
-				
-				foreach (var item in response)
-				{
-					if ((!item.State.IsNullOrEmpty() && item.State.StartsWith("FATAL:")) || item.Proxy == 10) //todo fix here
-						continue;
-					Account account = AccountsList.Find(acc => acc.ID == item.ID);
-					if (account != null) await account.CheckTokenAndLoginIsNotValid();
-					else
+					var response = postgre.Table?.AsNoTracking().OrderBy(x => x.ID).ToList();
+					if (response == null || response.Count <= 0)
 					{
-						try
-						{
-							account = new Account(item)
-							{
-								Username = item.Username,
-								Password = item.Password,
-								SecurityToken = item.Token
-							};
-							await account.CheckTokenAndLoginIsNotValid();
-							if (account.Valid) AccountsList.Add(account);
-						}
-						catch (Exception ex) {
-							Logger.Error($"Error while creating account.", ex);
-						}
+						Logger.Information($"No account data found from postgre.");
+						return;
 					}
-					if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
+					maxAcc = response.Count;
+					foreach (var item in response)
+					{
+						if ((!item.State.IsNullOrEmpty() && item.State.StartsWith("FATAL:")) || item.Proxy == 10) //todo fix here
+							continue;
+						Account account = AccountsList.Find(acc => acc.ID == item.ID);
+						if (account != null) await account.CheckTokenAndLoginIsNotValid();
+						else
+						{
+							try
+							{
+								account = new Account(item)
+								{
+									Username = item.Username,
+									Password = item.Password,
+									SecurityToken = item.Token
+								};
+								await account.CheckTokenAndLoginIsNotValid();
+								if (account.Valid) AccountsList.Add(account);
+							}
+							catch (Exception ex)
+							{
+								Logger.Error($"Error while creating account.", ex);
+							}
+						}
+						if (AccountsList.Count >= Machine.Get<int>("MaxAccountLoggedIn")) break;
+					}
+					postgre.Dispose();
 				}
 			}
 			catch (Exception ex)

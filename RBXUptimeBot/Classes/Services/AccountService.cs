@@ -1,4 +1,6 @@
-﻿using RBXUptimeBot.Models.Entities;
+﻿using Microsoft.EntityFrameworkCore;
+using RBXUptimeBot.Classes.Services;
+using RBXUptimeBot.Models.Entities;
 
 namespace RBXUptimeBot.Classes
 {
@@ -7,7 +9,16 @@ namespace RBXUptimeBot.Classes
 		private void UpdateEntity()
 		{
 			Entity.LastUpdate = DateTime.UtcNow;
-			try { AccountManager.AccountService.SaveChangesAsync(); } catch { }
+			using (var postgre = new PostgreService<AccountTableEntity>(new DbContextOptionsBuilder<PostgreService<AccountTableEntity>>().UseNpgsql(AccountManager.ConnStr).Options))
+			{
+				try {
+					postgre.Attach(Entity);
+					postgre.Entry(Entity).State = EntityState.Modified;
+					postgre.SaveChanges();
+				} catch (Exception ex) {
+					Logger.Error($"Error while updating account entity: {ex.Message}", ex);
+				}
+			}
 		}
 
 		private void UpdateToken(string token)

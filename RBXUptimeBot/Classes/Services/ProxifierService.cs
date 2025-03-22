@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using RBXUptimeBot.Models.Entities;
+using System;
 using System.Diagnostics;
 using System.Net;
 using System.Xml;
@@ -18,10 +20,10 @@ namespace RBXUptimeBot.Classes.Services
 		private static readonly string ProxyPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Proxies");
 		private static readonly string TempProxyFile = "ProxyFile.ppx";
 		private static List<Proxy> Proxies = new List<Proxy>();
+		private static Process proxifierProcess;
 
 		private Proxy _Proxy;
 		public Proxy Proxy { get => _Proxy; }
-		private static Process proxifierProcess;
 
 		public ProxifierService(int _proxyId) {
 			_Proxy = Proxies.Find(p => p.ProxyId == _proxyId);
@@ -172,6 +174,7 @@ namespace RBXUptimeBot.Classes.Services
 				if (proxifierProcess != null && !proxifierProcess.HasExited)
 				{
 					proxifierProcess.Kill();
+					proxifierProcess.Dispose();
 					proxifierProcess = null;
 					DeleteProxyProfile();
 				}
@@ -218,30 +221,33 @@ namespace RBXUptimeBot.Classes.Services
 			while (true) {
 				try
 				{
-					var response = AccountManager.ProxyService.Table?.ToList();
-					if (response == null) continue;
-					foreach (var item in response)
+					using (var postgre = new PostgreService<ProxyTableEntity>(new DbContextOptionsBuilder<PostgreService<ProxyTableEntity>>().UseNpgsql(AccountManager.ConnStr).Options))
 					{
-						var exist = Proxies.Find(p => p.ProxyId == item.ID);
-						Proxy tmp = new Proxy()
+						var response = await postgre.Table?.ToListAsync();
+						if (response == null) continue;
+						foreach (var item in response)
 						{
-							ProxyId = item.ID,
-							ProxyIP = item.ProxyIP,
-							ProxyPort = item.ProxyPort,
-							ProxyName = item.ProxyName,
-							ProxyUsername = item.ProxyUser,
-							ProxyPassword = item.ProxyPassword
-						};
-						if (exist == null) Proxies.Add(tmp);
-						else if (exist != tmp)
-						{
-							Proxies.Remove(exist);
-							Proxies.Add(tmp);
+							var exist = Proxies.Find(p => p.ProxyId == item.ID);
+							Proxy tmp = new Proxy()
+							{
+								ProxyId = item.ID,
+								ProxyIP = item.ProxyIP,
+								ProxyPort = item.ProxyPort,
+								ProxyName = item.ProxyName,
+								ProxyUsername = item.ProxyUser,
+								ProxyPassword = item.ProxyPassword
+							};
+							if (exist == null) Proxies.Add(tmp);
+							else if (exist != tmp)
+							{
+								Proxies.Remove(exist);
+								Proxies.Add(tmp);
+							}
 						}
 					}
 				}
 				catch (Exception ex) { }
-				Task.Delay(TimeSpan.FromMinutes(10));
+				await Task.Delay(TimeSpan.FromMinutes(10));
 			}
 		}
 	}
