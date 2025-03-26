@@ -60,9 +60,24 @@ namespace RBXUptimeBot.Controllers
 				var job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == text.ToString());
 				if (job == null)
 					return BadRequest("Job not found.");
-				return Ok(job);
+				return Ok(new {
+					DBObject = job.JobEntity,
+					AccountCount = $"{job.AccountCount}/{job.ProcessList.Count}",
+					Running = job.isRunning,
+					StartTime = job.startTime,
+					EndTime = job.endTime,
+					Processes = job.ProcessList
+				});
 			}
-			return Ok(AccountManager.ActiveJobs);
+			List<object> jobs = new List<object>();
+			AccountManager.ActiveJobs.ForEach(x => jobs.Add(new
+			{
+				DBObject = x.JobEntity,
+				AccountCount = $"{x.AccountCount}/{x.ProcessList.Count}",
+				Running = x.isRunning,
+				StartTime = x.startTime,
+			}));
+			return Ok(jobs);
 		}
 	}
 }

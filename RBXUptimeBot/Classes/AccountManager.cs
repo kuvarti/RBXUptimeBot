@@ -264,7 +264,9 @@ namespace RBXUptimeBot.Classes
 
 			foreach (Account account in Accounts)
 			{
-				if (Token.IsCancellationRequested) break;
+				if (Token.IsCancellationRequested) {
+					account.IsActive = 0;
+				};
 
 				long PlaceId = PlaceID;
 				string JobId = JobID;

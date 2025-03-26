@@ -106,6 +106,7 @@ namespace RBXUptimeBot.Classes.Services
 		// Assingning early bc; it can be used from another process while running
 		public async Task AddProcess(long jid)
 		{
+			int x = 0;
 			List<Account> items = new List<Account>();
 			ActiveJob job = AccountManager.ActiveJobs.Find(x => x.JobEntity.PlaceID == jid.ToString());
 
@@ -120,7 +121,9 @@ namespace RBXUptimeBot.Classes.Services
 				{
 					account.IsActive = 1;
 					items.Add(account);
+					x++;
 				}
+				if (x > 10) break;
 			}
 			if (items.Count == 0)
 				Logger.Warning($"No more accounts to launch for job {jid}");
