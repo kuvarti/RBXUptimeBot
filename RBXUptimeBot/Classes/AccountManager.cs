@@ -168,7 +168,7 @@ namespace RBXUptimeBot.Classes
 					maxAcc = response.Count;
 					foreach (var item in response)
 					{
-						if ((!item.State.IsNullOrEmpty() && item.State.StartsWith("FATAL:")) || item.Proxy == 10) //todo fix here
+						if (!item.State.IsNullOrEmpty() && item.State.StartsWith("FATAL:"))
 							continue;
 						Account account = AccountsList.Find(acc => acc.ID == item.ID);
 						if (account != null) await account.CheckTokenAndLoginIsNotValid();
