@@ -312,7 +312,8 @@ namespace RBXUptimeBot.Classes
 					await Task.Delay(TimeSpan.FromSeconds(2));
 					active += 2;
 				}
-				if (!page.IsClosed) page.CloseAsync();
+				if (!page.IsClosed) await page.CloseAsync();
+				try { page.Dispose(); } catch { }
 			}
 			catch (Exception ex)
 			{
