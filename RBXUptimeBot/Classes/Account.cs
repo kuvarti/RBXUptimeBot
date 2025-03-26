@@ -385,10 +385,10 @@ namespace RBXUptimeBot.Classes
 						return;
 					}
 
+					_Ticket = Ticket;
 					Process pid = await Wait4Roblox(Ticket);
 					if (pid == null) throw new Exception($"Something wrong with this roblox instance: Bloxstrap cannot launch roblox. {Username}");
 					IsActive = pid.Id;
-					_Ticket = Ticket;
 
 					Task errorcheck = Task.Run(async () =>
 					{
@@ -466,7 +466,8 @@ namespace RBXUptimeBot.Classes
 				var proxList = Process.GetProcessesByName("RobloxPlayerBeta");
 				foreach (var item in proxList)
 				{
-					if (CheckTicket(item.GetCommandLine(), _Ticket))
+					if (_Ticket == null) break;
+					if (CheckTicket(item.GetCommandLine(), _Ticket ?? string.Empty))
 					{
 						try {
 							item.CloseMainWindow();
