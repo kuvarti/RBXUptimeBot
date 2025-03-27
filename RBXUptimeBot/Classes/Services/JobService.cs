@@ -123,7 +123,7 @@ namespace RBXUptimeBot.Classes.Services
 					items.Add(account);
 					x++;
 				}
-				if (x > 10) break;
+				if (x >= 10) break;
 			}
 			if (items.Count == 0)
 				Logger.Warning($"No more accounts to launch for job {jid}");
