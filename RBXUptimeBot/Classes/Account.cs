@@ -443,7 +443,8 @@ namespace RBXUptimeBot.Classes
 			IsActive = 0;
 		}
 
-		private bool CheckTicket(string command, string ticket) => command.Contains(ticket);
+		private bool CheckTicket(string command, string ticket) =>
+			string.IsNullOrEmpty(ticket) ? false : command.Contains(ticket);
 
 		public void LeaveServer(long jid = 0)
 		{
@@ -467,10 +468,9 @@ namespace RBXUptimeBot.Classes
 				foreach (var item in proxList)
 				{
 					if (_Ticket == null) break;
-					if (CheckTicket(item.GetCommandLine(), _Ticket ?? string.Empty))
+					if (CheckTicket(item.GetCommandLine(), _Ticket))
 					{
 						try {
-							item.CloseMainWindow();
 							item.Kill();
 						} catch { }
 						break;
